@@ -214,13 +214,18 @@ endfunction
 " for it)
 function! <SID>NeedSkipBuffer(buf)
 
+   " file should be readable
+   if !filereadable(expand(a:buf))
+      return 1
+   endif
+
    " &buftype should be empty for regular files
    if !empty(getbufvar(a:buf, "&buftype"))
       return 1
    endif
 
    " buffer name should not be empty
-   if empty(expand('%'))
+   if empty(expand(a:buf))
       return 1
    endif
 
@@ -268,10 +273,10 @@ endfunction
 
 function! <SID>OnFileOpen()
    call <SID>CreateDefaultProjectIfNotAlready()
-   "call confirm("OnFileOpen ".expand('%')." ".bufnr('%'))
+   "call confirm("OnFileOpen: ".expand('<afile>').' buftype: "'.getbufvar('<afile>', "&buftype").'"')
 
-   if (<SID>NeedSkipBuffer('%'))
-      "call confirm ("skipped ".expand('%'))
+   if (<SID>NeedSkipBuffer('<afile>'))
+      "call confirm ("skipped ".expand('<afile>'))
       return
    endif
 
@@ -360,9 +365,7 @@ endfunction
 function! <SID>OnBufEnter()
    call <SID>CreateDefaultProjectIfNotAlready()
 
-   "call confirm("OnBufEnter ".expand('%')." ".bufnr('%'))
-   if (<SID>NeedSkipBuffer('%'))
-      "call confirm("skipped")
+   if (<SID>NeedSkipBuffer('<afile>'))
       return
    endif
 
