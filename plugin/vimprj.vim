@@ -2,9 +2,9 @@
 
 call vimprj#init()
 
-function! g:vimprj#dHooks['OnAddNewVimprjRoot']['test'](dParams)
+"function! g:vimprj#dHooks['OnAddNewVimprjRoot']['test'](dParams)
    "echo a:dParams
-endfunction
+"endfunction
 
 "function! g:vimprj#dHooks.onTest.second(dParams)
    "echo "second! "

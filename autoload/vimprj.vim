@@ -40,14 +40,11 @@ function! vimprj#init()
             \     'SetDefaultOptions'   : {},
             \     'OnAddFile'           : {},
             \     'OnFileOpen'          : {},
-            \     'ApplyVimprjSettings' : {},
+            \     'ApplyVimprjSettings_before' : {},
+            \     'ApplyVimprjSettings_after' : {},
             \  
             \     'onTest'              : {},
             \  }
-
-   " создаем дефолтный "проект"
-   call <SID>AddNewVimprjRoot("default", "", getcwd())
-   call <SID>AddFile(0, 'default')
 
    " запоминаем начальные &path
    "let s:sPathDefault = &path
@@ -80,6 +77,15 @@ function! vimprj#init()
 
 endfunction
 
+function! <SID>CreateDefaultProjectIfNotAlready()
+   if !has_key(g:vimprj#dRoots, "default")
+      " создаем дефолтный "проект"
+      call <SID>AddNewVimprjRoot("default", "", getcwd())
+      call <SID>AddFile(0, 'default')
+      "x3, надо ли послед.строчка
+      let g:vimprj#sCurVimprjKey = "default"  
+   endif
+endfunction
 
 function! <SID>AddFile(iBufNum, sVimprjKey)
    let g:vimprj#dFiles[ a:iBufNum ] = {'sVimprjKey' : a:sVimprjKey}
@@ -109,6 +115,7 @@ function! <SID>_AddToDebugLog(iLevel, sType, dData)
 endfunction
 
 function! <SID>ExecHooks(sHooksgroup, dParams)
+   "call confirm("ExecHooks ".a:sHooksgroup)
    let l:lRetValues = []
 
    if !has_key(g:vimprj#dHooks, a:sHooksgroup)
@@ -116,14 +123,15 @@ function! <SID>ExecHooks(sHooksgroup, dParams)
       return 
    endif
 
-   for s:sKey in keys(g:vimprj#dHooks[ a:sHooksgroup ])
+   for l:sKey in keys(g:vimprj#dHooks[ a:sHooksgroup ])
+      "call confirm("-- ".l:sKey)
 
-      call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ s:sKey ](a:dParams))
+      call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](a:dParams))
 
-      "echo s:sKey
-      "call g:vimprj#dHooks[ a:sHooksgroup ][ s:sKey ](a:dParams)
+      "echo l:sKey
+      "call g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](a:dParams)
 
-      "let l:tmp = g:vimprj#dHooks[ a:sHooksgroup ][ s:sKey ](a:dParams)
+      "let l:tmp = g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](a:dParams)
       "call add(l:lRetValues, l:tmp)
       "unlet l:tmp
 
@@ -165,6 +173,10 @@ function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
    endif
 endfunction
 
+" HACK!
+function! ApplyVimprjSettings(sVimprjKey)
+   call <SID>ApplyVimprjSettings(a:sVimprjKey)
+endfunction
 
 
 " applies all settings from .vimprj dir
@@ -183,11 +195,13 @@ function! <SID>ApplyVimprjSettings(sVimprjKey)
    "endif
 
    "call confirm("applying")
+   call <SID>ExecHooks('ApplyVimprjSettings_before', {'sVimprjKey' : a:sVimprjKey})
+
    call <SID>SourceVimprjFiles(g:vimprj#dRoots[ a:sVimprjKey ]["path"])
    call <SID>ChangeDirToVimprj(g:vimprj#dRoots[ a:sVimprjKey ]["cd_path"])
 
 
-   call <SID>ExecHooks('ApplyVimprjSettings', {'sVimprjKey' : a:sVimprjKey})
+   call <SID>ExecHooks('ApplyVimprjSettings_after', {'sVimprjKey' : a:sVimprjKey})
 
    "let l:sTmp .= "===".&ts
    "let l:tmp2 = input(l:sTmp)
@@ -207,12 +221,14 @@ function! <SID>NeedSkipBuffer(buf)
       return 1
    endif
 
+   " buffer name should not be empty
    if empty(expand('%'))
       return 1
    endif
 
 
    let l:lNeedSkip = <SID>ExecHooks('NeedSkipBuffer', {'sBuf' : a:buf})
+
    for l:boolCurNeedSkip in l:lNeedSkip
       if l:boolCurNeedSkip
          return 1
@@ -247,6 +263,7 @@ function! <SID>GetKeyFromPath(sPath)
 endfunction
 
 function! <SID>OnFileOpen()
+   call <SID>CreateDefaultProjectIfNotAlready()
    "call confirm("OnFileOpen ".expand('%')." ".bufnr('%'))
 
    if (<SID>NeedSkipBuffer('%'))
@@ -329,6 +346,10 @@ function! <SID>OnFileOpen()
 
    call <SID>ExecHooks('OnFileOpen', {})
 
+   " для того, чтобы при входе в OnBufEnter сработал IsBufSwitched, ставим
+   " текущий номер буфера в 0
+   let g:vimprj#iCurFileNum = 0
+
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnFileOpen__', {})
 endfunction
 
@@ -339,6 +360,8 @@ endfunction
 
 
 function! <SID>OnBufEnter()
+   call <SID>CreateDefaultProjectIfNotAlready()
+
    "call confirm("OnBufEnter ".expand('%')." ".bufnr('%'))
    if (<SID>NeedSkipBuffer('%'))
       "call confirm("skipped")
