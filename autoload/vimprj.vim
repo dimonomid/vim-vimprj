@@ -157,7 +157,11 @@ endfunction
    "echo a:dParams
 "endfunction
 
+
 " добавляет новый vimprj root, заполняет его текущими параметрами
+"
+" ВНИМАНИЕ! "текущими" параметрами - это означает, что на момент вызова
+" этого метода все .vim файлы из .vimprj уже должны быть выполнены!
 function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
 
    if !has_key(g:vimprj#dRoots, a:sKey)
@@ -179,18 +183,12 @@ function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
    endif
 endfunction
 
-" HACK!
-function! ApplyVimprjSettings(sVimprjKey)
-   call <SID>ApplyVimprjSettings(a:sVimprjKey)
-endfunction
-
 
 " applies all settings from .vimprj dir
-function! <SID>ApplyVimprjSettings(sVimprjKey)
+function! vimprj#applyVimprjSettings(sVimprjKey)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __ApplyVimprjSettings__', {'sVimprjKey' : a:sVimprjKey})
 
-   "call confirm("applying")
 
    " TODO
    "if (!empty(s:indexer_defaultSettingsFilename))
@@ -240,10 +238,11 @@ function! <SID>NeedSkipBuffer(buf)
 endfunction
 
 function! <SID>SourceVimprjFiles(sPath)
+   
+   call <SID>ExecHooks('SourceVimprjFiles_before', {'sDirName' : a:sPath})
+
    if (!empty(a:sPath))
       " sourcing all *vim files in .vimprj dir
-
-      call <SID>ExecHooks('SourceVimprjFiles_before', {'sDirName' : a:sPath})
 
       let l:lSourceFilesList = split(glob(a:sPath.'/*vim'), '\n')
       let l:sThisFile = expand('%:p')
@@ -257,6 +256,8 @@ endfunction
 function! <SID>ChangeDirToVimprj(sPath)
    " переключаем рабочую директорию
    if (g:vimprj_changeCurDirIfVimprjFound)
+      exec "cd ".a:sPath
+      " ???? иначе не работает
       exec "cd ".a:sPath
    endif
 endfunction
@@ -299,7 +300,7 @@ function! <SID>OnFileOpen()
       let l:i = l:i + 1
    endwhile
 
-   if l:sProjectRoot != ''
+   if !empty(l:sProjectRoot)
 
       " проверяем, не открыли ли мы файл из директории .vimprj
       let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
@@ -308,39 +309,29 @@ function! <SID>OnFileOpen()
       if (strpart(expand('%:p:h'), 0, l:iPathToDNFSlen) != l:sPathToDirNameForSearch)
          " нет, открытый файл - не из директории .vimprj, так что применяем
          " для него настройки из этой директории .vimprj
-         "let l:sVimprjKey = l:sNewVimprjKey
-
-         " project root was found.
-         "
-         " set directory for tags in .vimprj dir
-         " let s:tagsDirname = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch.'/tags'
-
-         " сбросить все g:indexer_.. на дефолтные
-
-
          let l:sVimprjKey = <SID>GetKeyFromPath(l:sProjectRoot)
-         if !has_key(g:vimprj#dRoots, l:sVimprjKey)
+      endif
+   endif
 
-            call <SID>ExecHooks('SetDefaultOptions', {})
 
-            " sourcing all *vim files in .vimprj dir
+   if !has_key(g:vimprj#dRoots, l:sVimprjKey)
 
-            call <SID>SourceVimprjFiles(l:sProjectRoot.'/'.g:vimprj_dirNameForSearch)
-            call <SID>ChangeDirToVimprj(substitute(l:sProjectRoot, ' ', '\\ ', 'g'))
+      call <SID>ExecHooks('SetDefaultOptions', {})
 
-            call <SID>AddNewVimprjRoot(l:sVimprjKey, l:sProjectRoot, l:sProjectRoot)
-         else
-            if l:sVimprjKey != g:vimprj#sCurVimprjKey
-               call <SID>ApplyVimprjSettings(l:sVimprjKey)
-            endif
+      " sourcing all *vim files in .vimprj dir
 
-         endif
+      call <SID>SourceVimprjFiles(l:sProjectRoot.'/'.g:vimprj_dirNameForSearch)
+      call <SID>ChangeDirToVimprj(substitute(l:sProjectRoot, ' ', '\\ ', 'g'))
 
+      call <SID>AddNewVimprjRoot(l:sVimprjKey, l:sProjectRoot, l:sProjectRoot)
+   else
+      if l:sVimprjKey != g:vimprj#sCurVimprjKey
+         call vimprj#applyVimprjSettings(l:sVimprjKey)
       endif
 
-
-
    endif
+
+
 
    call <SID>AddFile(bufnr('%'), l:sVimprjKey)
    "let g:vimprj#dFiles[ a:iBufNum ]['justAdded'] = 1
@@ -392,7 +383,7 @@ function! <SID>OnBufEnter()
 
    " applying vimprj settings if only vimprj root changed
    if l:sPrevVimprjKey != g:vimprj#sCurVimprjKey
-      call <SID>ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
+      call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey)
    endif
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __OnBufEnter__', {})
