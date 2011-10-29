@@ -117,13 +117,15 @@ function! <SID>ExecHooks(sHooksgroup, dParams)
    endif
 
    for s:sKey in keys(g:vimprj#dHooks[ a:sHooksgroup ])
-      "call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ s:sKey ](a:dParams))
+
+      call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ s:sKey ](a:dParams))
+
       "echo s:sKey
       "call g:vimprj#dHooks[ a:sHooksgroup ][ s:sKey ](a:dParams)
 
-      let l:tmp = g:vimprj#dHooks[ a:sHooksgroup ][ s:sKey ](a:dParams)
-      call add(l:lRetValues, l:tmp)
-      unlet l:tmp
+      "let l:tmp = g:vimprj#dHooks[ a:sHooksgroup ][ s:sKey ](a:dParams)
+      "call add(l:lRetValues, l:tmp)
+      "unlet l:tmp
 
    endfor
    return l:lRetValues
