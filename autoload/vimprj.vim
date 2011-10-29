@@ -160,7 +160,7 @@ endfunction
 " добавляет новый vimprj root, заполняет его текущими параметрами
 function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
 
-   if (!exists("g:vimprj#dRoots['".a:sKey."']"))
+   if !has_key(g:vimprj#dRoots, a:sKey)
 
       call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __AddNewVimprjRoot__', {'sKey' : a:sKey, 'sPath' : a:sPath, 'sCdPath' : a:sCdPath})
 
@@ -317,22 +317,25 @@ function! <SID>OnFileOpen()
 
          " сбросить все g:indexer_.. на дефолтные
 
-         call <SID>ExecHooks('SetDefaultOptions', {})
-
-         " sourcing all *vim files in .vimprj dir
-
-         call <SID>SourceVimprjFiles(l:sProjectRoot.'/'.g:vimprj_dirNameForSearch)
-         call <SID>ChangeDirToVimprj(substitute(l:sProjectRoot, ' ', '\\ ', 'g'))
-
-         "call <SID>ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
 
          let l:sVimprjKey = <SID>GetKeyFromPath(l:sProjectRoot)
-         call <SID>AddNewVimprjRoot(l:sVimprjKey, l:sProjectRoot, l:sProjectRoot)
+         if !has_key(g:vimprj#dRoots, l:sVimprjKey)
 
-         "exec 'cd '.substitute(l:sProjectRoot, ' ', '\\ ', 'g')
+            call <SID>ExecHooks('SetDefaultOptions', {})
 
-         "call confirm(g:vimprj#dRoots[l:sVimprjKey].path)
-         "call <SID>ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
+            " sourcing all *vim files in .vimprj dir
+
+            call <SID>SourceVimprjFiles(l:sProjectRoot.'/'.g:vimprj_dirNameForSearch)
+            call <SID>ChangeDirToVimprj(substitute(l:sProjectRoot, ' ', '\\ ', 'g'))
+
+            call <SID>AddNewVimprjRoot(l:sVimprjKey, l:sProjectRoot, l:sProjectRoot)
+         else
+            if l:sVimprjKey != g:vimprj#sCurVimprjKey
+               call <SID>ApplyVimprjSettings(l:sVimprjKey)
+            endif
+
+         endif
+
       endif
 
 
@@ -349,16 +352,10 @@ function! <SID>OnFileOpen()
             \     'iFileNum'   : bufnr('%'),
             \  })
 
-   "call <SID>ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
-
    " для того, чтобы при входе в OnBufEnter сработал IsBufSwitched, ставим
    " текущий номер буфера в 0
    "let g:vimprj#iCurFileNum = 0
    "let g:vimprj#sCurVimprjKey = "default"
-
-   "call <SID>ExecHooks('ApplyVimprjSettings_before', {'sVimprjKey' : g:vimprj#sCurVimprjKey})
-   "call <SID>ExecHooks('ApplyVimprjSettings_after', {'sVimprjKey' : g:vimprj#sCurVimprjKey})
-
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnFileOpen__', {})
 endfunction
@@ -393,10 +390,11 @@ function! <SID>OnBufEnter()
    let l:sPrevVimprjKey = g:vimprj#sCurVimprjKey
    call <SID>SetCurrentFile()
 
-
+   " applying vimprj settings if only vimprj root changed
    if l:sPrevVimprjKey != g:vimprj#sCurVimprjKey
       call <SID>ApplyVimprjSettings(g:vimprj#sCurVimprjKey)
    endif
+
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __OnBufEnter__', {})
 
 endfunction
