@@ -50,7 +50,6 @@ function! vimprj#init()
             \     'SetDefaultOptions'   : {},
             \     'OnAddFile'           : {},
             \     'OnFileOpen'          : {},
-            \     'SourceVimprjFiles_before' : {},
             \     'ApplyVimprjSettings_after' : {},
             \  
             \     'onTest'              : {},
@@ -268,7 +267,7 @@ endfunction
 function! <SID>SourceVimprjFiles(sPath)
    "call confirm("sourcing files from: ". a:sPath)
    
-   call <SID>ExecHooks('SourceVimprjFiles_before', {'sDirName' : a:sPath})
+   call <SID>ExecHooks('SetDefaultOptions', {'sDirName' : a:sPath})
 
    if (!empty(a:sPath))
       " sourcing all *vim files in .vimprj dir
@@ -354,8 +353,6 @@ function! <SID>OnFileOpen()
 
    if !has_key(g:vimprj#dRoots, l:sVimprjKey)
       " adding
-
-      call <SID>ExecHooks('SetDefaultOptions', {})
 
       " sourcing all *vim files in .vimprj dir
 
