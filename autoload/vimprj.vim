@@ -41,6 +41,7 @@ function! vimprj#init()
    let g:vimprj#dRoots = {}
    let g:vimprj#dFiles = {}
    let g:vimprj#iCurFileNum = 0
+   let g:vimprj#sCurVimprjKey = 'default'
    "  g:vimprj#sCurVimprjKey устанавливается позднее (хотя, может, это и не
    "  обязательно)
    let g:vimprj#dHooks = {
@@ -92,11 +93,13 @@ function! <SID>CreateDefaultProjectIfNotAlready()
       call <SID>AddNewVimprjRoot("default", "", getcwd())
       call <SID>AddFile(0, 'default')
       "x3, надо ли послед.строчка
-      let g:vimprj#sCurVimprjKey = "default"  
+      "let g:vimprj#sCurVimprjKey = "default"  
    endif
 endfunction
 
 function! <SID>AddFile(iBufNum, sVimprjKey)
+   "call confirm('AddFile '.a:iBufNum.' '.a:sVimprjKey)
+
    let g:vimprj#dFiles[ a:iBufNum ] = {'sVimprjKey' : a:sVimprjKey}
    call <SID>ExecHooks('OnAddFile', {'iBufNum' : a:iBufNum, 'sVimprjKey' : a:sVimprjKey})
 endfunction
@@ -105,13 +108,12 @@ endfunction
 " sets
 "    g:vimprj#iCurFileNum     ( from bufnr('%') )
 "    g:vimprj#sCurVimprjKey   ( from g:vimprj#dFiles )
-function! <SID>SetCurrentFile()
+function! <SID>SetCurrentFile(iFileNum)
 
-   call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __SetCurrentFile__', {'filename' : expand('%')})
+   call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __SetCurrentFile__', {'filename' : expand('<afile>')})
 
-   "if (exists("g:vimprj#dFiles[".bufnr('%')."]"))
-   if has_key(g:vimprj#dFiles, bufnr('%'))
-      let g:vimprj#iCurFileNum = bufnr('%')
+   if has_key(g:vimprj#dFiles, a:iFileNum)
+      let g:vimprj#iCurFileNum = a:iFileNum
    else
       let g:vimprj#iCurFileNum = 0
    endif
@@ -128,8 +130,10 @@ function! <SID>_AddToDebugLog(iLevel, sType, dData)
 endfunction
 
 function! <SID>ExecHooks(sHooksgroup, dParams)
+   "echoerr a:sHooksgroup
    "call confirm("ExecHooks ".a:sHooksgroup)
    let l:lRetValues = []
+   let l:dParams = a:dParams
 
    if !has_key(g:vimprj#dHooks, a:sHooksgroup)
       echoerr "No hook group ".a:sHooksgroup
@@ -139,12 +143,19 @@ function! <SID>ExecHooks(sHooksgroup, dParams)
    for l:sKey in keys(g:vimprj#dHooks[ a:sHooksgroup ])
       "call confirm("-- ".l:sKey)
 
-      call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](a:dParams))
+
+      silent! let l:dParams['dVimprjRootParams'] = 
+                  \  g:vimprj#dRoots[g:vimprj#sCurVimprjKey][ l:sKey ]
+
+      call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](l:dParams))
+
+      silent! unlet l:dParams['dVimprjRootParams']
+
 
       "echo l:sKey
-      "call g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](a:dParams)
+      "call g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](l:dParams)
 
-      "let l:tmp = g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](a:dParams)
+      "let l:tmp = g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](l:dParams)
       "call add(l:lRetValues, l:tmp)
       "unlet l:tmp
 
@@ -192,7 +203,7 @@ endfunction
 
 
 " applies all settings from .vimprj dir
-function! vimprj#applyVimprjSettings(sVimprjKey)
+function! vimprj#applyVimprjSettings(sVimprjKey, iFileNum)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __ApplyVimprjSettings__', {'sVimprjKey' : a:sVimprjKey})
 
@@ -206,7 +217,10 @@ function! vimprj#applyVimprjSettings(sVimprjKey)
    call <SID>ChangeDirToVimprj(g:vimprj#dRoots[ a:sVimprjKey ]["cd_path"])
 
 
-   call <SID>ExecHooks('ApplyVimprjSettings_after', {'sVimprjKey' : a:sVimprjKey})
+   call <SID>ExecHooks('ApplyVimprjSettings_after', {
+            \     'sVimprjKey' : a:sVimprjKey,
+            \     'iFileNum'   : a:iFileNum,
+            \  })
 
    "let l:sTmp .= "===".&ts
    "let l:tmp2 = input(l:sTmp)
@@ -219,25 +233,27 @@ endfunction
 
 " returns if we should to skip this buffer ('skip' means not to generate tags
 " for it)
-function! <SID>NeedSkipBuffer(buf)
+function! <SID>NeedSkipBuffer(iFileNum)
 
    " file should be readable
-   if !filereadable(expand(a:buf))
+   if !filereadable(bufname(a:iFileNum))
       return 1
    endif
 
    " &buftype should be empty for regular files
-   if !empty(getbufvar(a:buf, "&buftype"))
+   if !empty(getbufvar(a:iFileNum, "&buftype"))
       return 1
    endif
 
    " buffer name should not be empty
-   if empty(expand(a:buf))
+   if empty(bufname(a:iFileNum))
       return 1
    endif
 
 
-   let l:lNeedSkip = <SID>ExecHooks('NeedSkipBuffer', {'sBuf' : a:buf})
+   let l:lNeedSkip = <SID>ExecHooks('NeedSkipBuffer', {
+            \     'iFileNum' : a:iFileNum,
+            \  })
 
    for l:boolCurNeedSkip in l:lNeedSkip
       if l:boolCurNeedSkip
@@ -280,11 +296,13 @@ function! <SID>GetKeyFromPath(sPath)
 endfunction
 
 function! <SID>OnFileOpen()
-   call <SID>CreateDefaultProjectIfNotAlready()
-   "call confirm("OnFileOpen: ".expand('<afile>').' buftype: "'.getbufvar('<afile>', "&buftype").'"')
 
-   if (<SID>NeedSkipBuffer('<afile>'))
-      "call confirm ("skipped ".expand('<afile>'))
+   let l:iFileNum = bufnr(expand('<afile>'))
+
+
+   call <SID>CreateDefaultProjectIfNotAlready()
+
+   if (<SID>NeedSkipBuffer(l:iFileNum))
       return
    endif
 
@@ -332,6 +350,8 @@ function! <SID>OnFileOpen()
    " if this .vimprj project is not known yet, then adding it.
    " otherwise just applying settings, if necessary.
 
+   call <SID>AddFile(l:iFileNum, l:sVimprjKey)
+
    if !has_key(g:vimprj#dRoots, l:sVimprjKey)
       " adding
 
@@ -347,21 +367,28 @@ function! <SID>OnFileOpen()
       " .vimprj project is known.
       " if it is inactive - applying settings from it.
       if l:sVimprjKey != g:vimprj#sCurVimprjKey
-         call vimprj#applyVimprjSettings(l:sVimprjKey)
+         call vimprj#applyVimprjSettings(l:sVimprjKey, l:iFileNum)
       endif
 
    endif
 
 
 
-   call <SID>AddFile(bufnr('%'), l:sVimprjKey)
    "let g:vimprj#dFiles[ a:iBufNum ]['justAdded'] = 1
 
-   call <SID>SetCurrentFile()
+   call <SID>SetCurrentFile(l:iFileNum)
+
+   " here we pass g:vimprj#sCurVimprjKey, g:vimprj#iCurFileNum
+   " because they are just modified by SetCurrentFile
 
    call <SID>ExecHooks('OnFileOpen', {
             \     'sVimprjKey' : l:sVimprjKey,
-            \     'iFileNum'   : bufnr('%'),
+            \     'iFileNum'   : l:iFileNum,
+            \  })
+
+   call <SID>ExecHooks('ApplyVimprjSettings_after', {
+            \     'sVimprjKey' : l:sVimprjKey,
+            \     'iFileNum'   : l:iFileNum,
             \  })
 
    " НЕ НАДО: для того, чтобы при входе в OnBufEnter сработал IsBufSwitched, ставим
@@ -379,10 +406,11 @@ endfunction
 
 
 function! <SID>OnBufEnter()
-   "call confirm ("OnBufEnter ".expand('<afile>'))
+   let l:iFileNum = bufnr(expand('<afile>'))
+
    call <SID>CreateDefaultProjectIfNotAlready()
 
-   if (<SID>NeedSkipBuffer('<afile>'))
+   if (<SID>NeedSkipBuffer(l:iFileNum))
       return
    endif
 
@@ -399,11 +427,11 @@ function! <SID>OnBufEnter()
    "let l:sTmp = input("OnBufWinEnter_".getbufvar('%', "&buftype"))
 
    let l:sPrevVimprjKey = g:vimprj#sCurVimprjKey
-   call <SID>SetCurrentFile()
+   call <SID>SetCurrentFile(l:iFileNum)
 
    " applying vimprj settings if only vimprj root changed
    if l:sPrevVimprjKey != g:vimprj#sCurVimprjKey
-      call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey)
+      call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey, l:iFileNum)
    endif
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __OnBufEnter__', {})
