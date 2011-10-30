@@ -1,7 +1,14 @@
 
 
-let g:vimprj#version = 1.00
-let s:boolInitialized = 0
+if v:version < 700
+   call confirm("vimprj: You need Vim 7.0 or higher")
+   finish
+endif
+
+let g:vimprj#version           = 100
+let g:vimprj#loaded            = 0
+
+let s:boolInitialized          = 0
 let s:bool_OnFileOpen_executed = 0
 
 
@@ -243,6 +250,7 @@ function! <SID>NeedSkipBuffer(buf)
 endfunction
 
 function! <SID>SourceVimprjFiles(sPath)
+   "call confirm("sourcing files from: ". a:sPath)
    
    call <SID>ExecHooks('SourceVimprjFiles_before', {'sDirName' : a:sPath})
 
@@ -307,7 +315,9 @@ function! <SID>OnFileOpen()
 
    if !empty(l:sProjectRoot)
 
+      " .vimprj directory is found.
       " проверяем, не открыли ли мы файл из директории .vimprj
+
       let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
       let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
 
@@ -319,7 +329,11 @@ function! <SID>OnFileOpen()
    endif
 
 
+   " if this .vimprj project is not known yet, then adding it.
+   " otherwise just applying settings, if necessary.
+
    if !has_key(g:vimprj#dRoots, l:sVimprjKey)
+      " adding
 
       call <SID>ExecHooks('SetDefaultOptions', {})
 
@@ -330,6 +344,8 @@ function! <SID>OnFileOpen()
 
       call <SID>AddNewVimprjRoot(l:sVimprjKey, l:sProjectRoot, l:sProjectRoot)
    else
+      " .vimprj project is known.
+      " if it is inactive - applying settings from it.
       if l:sVimprjKey != g:vimprj#sCurVimprjKey
          call vimprj#applyVimprjSettings(l:sVimprjKey)
       endif
@@ -348,7 +364,7 @@ function! <SID>OnFileOpen()
             \     'iFileNum'   : bufnr('%'),
             \  })
 
-   " для того, чтобы при входе в OnBufEnter сработал IsBufSwitched, ставим
+   " НЕ НАДО: для того, чтобы при входе в OnBufEnter сработал IsBufSwitched, ставим
    " текущий номер буфера в 0
    "let g:vimprj#iCurFileNum = 0
    "let g:vimprj#sCurVimprjKey = "default"
@@ -363,6 +379,7 @@ endfunction
 
 
 function! <SID>OnBufEnter()
+   "call confirm ("OnBufEnter ".expand('<afile>'))
    call <SID>CreateDefaultProjectIfNotAlready()
 
    if (<SID>NeedSkipBuffer('<afile>'))
