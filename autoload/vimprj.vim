@@ -71,6 +71,7 @@ function! vimprj#init()
             \     'SetDefaultOptions'    : {},
             \     'OnAddFile'            : {},
             \     'OnFileOpen'           : {},
+            \     'OnBufSave'            : {},
             \     'ApplySettingsForFile' : {},
             \  }
 
@@ -89,6 +90,11 @@ function! vimprj#init()
    augroup Vimprj_BufEnter
       autocmd! Vimprj_BufEnter BufEnter
       autocmd Vimprj_BufEnter BufEnter * call <SID>OnBufEnter()
+   augroup END
+
+   augroup Vimprj_BufWritePost
+      autocmd! Vimprj_BufWritePost BufWritePost
+      autocmd Vimprj_BufWritePost BufWritePost * call <SID>OnBufSave()
    augroup END
 
    let s:boolInitialized = 1
@@ -481,6 +487,22 @@ function! <SID>OnBufEnter()
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __OnBufEnter__', {})
 
 endfunction
+
+function! <SID>OnBufSave()
+   let l:iFileNum = bufnr(expand('<afile>'))
+
+   if has_key(g:vimprj#dFiles, l:iFileNum)
+
+      call <SID>ExecHooks('OnBufSave', {
+               \     'iFileNum'   : l:iFileNum,
+               \  })
+   else
+      " this may happen when saving file with another filename by command:
+      "     :w new_filename
+      " NOTE: this isn't the same as   :saveas new_filename
+   endif
+endfunction
+
 
 if !s:boolInitialized
    call vimprj#init()
