@@ -103,37 +103,42 @@ endfunction
 " @param dParams dictionary with params:
 "     'boolSwitchBackToCurVimprj' : if 1, then after parsing will be executed
 "        vimprj#applyVimprjSettings for current project
-"        (default: 0)
+"        (this is necessary option, no default value)
 "
 function! vimprj#parseNewVimprjRoot(sProjectRoot, dParams)
 
    " set default params
    let l:dParams = <SID>SetDefaultValues(a:dParams, {
-            \     'boolSwitchBackToCurVimprj' : 0,
+            \     'boolSwitchBackToCurVimprj' : -1,
             \  })
 
-   let l:sVimprjDirName = a:sProjectRoot.'/'.g:vimprj_dirNameForSearch
-
-   " if dir .vimprj exists, and if this vimprj_root has not been parsed yet 
-
-   if isdirectory(l:sVimprjDirName)
-      let l:sVimprjKey = <SID>GetKeyFromPath(a:sProjectRoot)
-      if !has_key(g:vimprj#dRoots, l:sVimprjKey)
-
-
-         call <SID>SourceVimprjFiles(l:sVimprjDirName)
-         call <SID>ChangeDirToVimprj(substitute(a:sProjectRoot, ' ', '\\ ', 'g'))
-
-         call <SID>AddNewVimprjRoot(l:sVimprjKey, a:sProjectRoot, a:sProjectRoot)
-
-
-         if l:dParams['boolSwitchBackToCurVimprj']
-            call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey)
-         endif
-      endif
+   if l:dParams['boolSwitchBackToCurVimprj'] == -1
+      echoerr "vimprj#parseNewVimprjRoot error: you need to specify option 'boolSwitchBackToCurVimprj'"
    else
-      echoerr "vimprj#parseNewVimprjRoot error: there's no ".g:vimprj_dirNameForSearch
-               \  ." dir in the project dir '".a:sProjectRoot."'"
+
+      let l:sVimprjDirName = a:sProjectRoot.'/'.g:vimprj_dirNameForSearch
+
+      " if dir .vimprj exists, and if this vimprj_root has not been parsed yet 
+
+      if isdirectory(l:sVimprjDirName)
+         let l:sVimprjKey = <SID>GetKeyFromPath(a:sProjectRoot)
+         if !has_key(g:vimprj#dRoots, l:sVimprjKey)
+
+
+            call <SID>SourceVimprjFiles(l:sVimprjDirName)
+            call <SID>ChangeDirToVimprj(substitute(a:sProjectRoot, ' ', '\\ ', 'g'))
+
+            call <SID>AddNewVimprjRoot(l:sVimprjKey, a:sProjectRoot, a:sProjectRoot)
+
+
+            if l:dParams['boolSwitchBackToCurVimprj']
+               call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey)
+            endif
+         endif
+      else
+         echoerr "vimprj#parseNewVimprjRoot error: there's no ".g:vimprj_dirNameForSearch
+                  \  ." dir in the project dir '".a:sProjectRoot."'"
+      endif
    endif
 
 endfunction
