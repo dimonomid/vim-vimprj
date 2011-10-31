@@ -323,7 +323,13 @@ function! <SID>ChangeDirToVimprj(sPath)
 endfunction
 
 function! <SID>GetKeyFromPath(sPath)
-   return substitute(a:sPath, '[^a-zA-Z0-9_]', '_', 'g')
+   let l:sKey = substitute(a:sPath, '[^a-zA-Z0-9_]', '_', 'g')
+
+   if has('win32') || has('win64')
+      let l:sKey = tolower(l:sKey)
+   endif
+
+   return l:sKey
 endfunction
 
 function! <SID>OnFileOpen()
