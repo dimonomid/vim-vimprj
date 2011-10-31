@@ -14,6 +14,29 @@ let s:boolInitialized          = 0
 let s:bool_OnFileOpen_executed = 0
 
 
+" <SID>IsAbsolutePath(path) <<<
+"   this function from project.vim is written by Aric Blumer.
+"   Returns true if filename has an absolute path.
+function! <SID>IsAbsolutePath(path)
+   if a:path =~ '^ftp:' || a:path =~ '^rcp:' || a:path =~ '^scp:' || a:path =~ '^http:'
+      return 2
+   endif
+   let path=expand(a:path) " Expand any environment variables that might be in the path
+   if path[0] == '/' || path[0] == '~' || path[0] == '\\' || path[1] == ':'
+      return 1
+   endif
+   return 0
+endfunction " >>>
+
+
+function! <SID>BufName(mValue)
+   let l:sFilename = bufname(a:mValue)
+   if !empty(l:sFilename) && !<SID>IsAbsolutePath(l:sFilename)
+      let l:sFilename = getcwd().'/'.l:sFilename
+   endif
+
+   return l:sFilename
+endfunction
 
 
 function! <SID>SetDefaultValues(dParams, dDefParams)
@@ -345,6 +368,47 @@ function! <SID>GetKeyFromPath(sPath)
    return l:sKey
 endfunction
 
+function! <SID>GetVimprjRootOfFile(iFileNum)
+
+   let l:sFilename = <SID>BufName(a:iFileNum) "expand('<afile>:p:h')
+
+   let l:i = 0
+   let l:sCurPath = ''
+   let l:sProjectRoot = ''
+   while (l:i < g:vimprj_recurseUpCount)
+      if (isdirectory(l:sFilename.l:sCurPath.'/'.g:vimprj_dirNameForSearch))
+         let l:sProjectRoot = simplify(l:sFilename.l:sCurPath)
+         break
+      endif
+      let l:sCurPath = l:sCurPath.'/..'
+      let l:i = l:i + 1
+   endwhile
+
+   if !empty(l:sProjectRoot)
+
+      " .vimprj directory is found.
+      " проверяем, не открыли ли мы файл из директории .vimprj
+
+      let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
+      let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
+
+      "if (strpart(l:sFilename, 0, l:iPathToDNFSlen) != l:sPathToDirNameForSearch)
+         "" нет, открытый файл - не из директории .vimprj, так что применяем
+         "" для него настройки из этой директории .vimprj
+         ""let l:sVimprjKey = <SID>GetKeyFromPath(l:sProjectRoot)
+      "endif
+
+      if (strpart(l:sFilename, 0, l:iPathToDNFSlen) == l:sPathToDirNameForSearch)
+         " открытый файл - из директории .vimprj, так что для него
+         " НЕ будем применять настройки из этой директории.
+         let l:sProjectRoot = ''
+      endif
+   endif
+
+   return l:sProjectRoot
+
+endfunction
+
 function! <SID>OnFileOpen()
 
    let l:iFileNum = bufnr(expand('<afile>'))
@@ -366,36 +430,13 @@ function! <SID>OnFileOpen()
    " dirname will be /path/to/dir/.vimprj/tags
 
    " ищем .vimprj
-   let l:sVimprjKey = "default"
-
-
-   let l:i = 0
-   let l:sCurPath = ''
-   let l:sProjectRoot = ''
-   while (l:i < g:vimprj_recurseUpCount)
-      if (isdirectory(expand('%:p:h').l:sCurPath.'/'.g:vimprj_dirNameForSearch))
-         let l:sProjectRoot = simplify(expand('%:p:h').l:sCurPath)
-         break
-      endif
-      let l:sCurPath = l:sCurPath.'/..'
-      let l:i = l:i + 1
-   endwhile
+   let l:sProjectRoot = <SID>GetVimprjRootOfFile(l:iFileNum)
 
    if !empty(l:sProjectRoot)
-
-      " .vimprj directory is found.
-      " проверяем, не открыли ли мы файл из директории .vimprj
-
-      let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
-      let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
-
-      if (strpart(expand('%:p:h'), 0, l:iPathToDNFSlen) != l:sPathToDirNameForSearch)
-         " нет, открытый файл - не из директории .vimprj, так что применяем
-         " для него настройки из этой директории .vimprj
-         let l:sVimprjKey = <SID>GetKeyFromPath(l:sProjectRoot)
-      endif
+      let l:sVimprjKey = <SID>GetKeyFromPath(l:sProjectRoot)
+   else
+      let l:sVimprjKey = "default"
    endif
-
 
    " if this .vimprj project is not known yet, then adding it.
    " otherwise just applying settings, if necessary.
@@ -406,6 +447,9 @@ function! <SID>OnFileOpen()
       " .vimprj project is NOT known.
       " adding.
 
+      " l:sProjectRoot can NEVER be empty here,
+      " because it is empty only for 'default' sVimprjKey,
+      " and this sVimprjKey is added when vim starts.
       call vimprj#parseNewVimprjRoot(l:sProjectRoot, {
                \     'boolSwitchBackToCurVimprj' : 0,
                \  })
@@ -492,6 +536,11 @@ function! <SID>OnBufSave()
    let l:iFileNum = bufnr(expand('<afile>'))
 
    if has_key(g:vimprj#dFiles, l:iFileNum)
+
+      " тут нужно искать vimprj root для нового имени файла,
+      " с пом-ю <SID>GetVimprjRootOfFile
+      " 
+      " и так далее.
 
       call <SID>ExecHooks('OnBufSave', {
                \     'iFileNum'   : l:iFileNum,
