@@ -5,11 +5,28 @@ if v:version < 700
    finish
 endif
 
+
+
 let g:vimprj#version           = 100
 let g:vimprj#loaded            = 0
 
 let s:boolInitialized          = 0
 let s:bool_OnFileOpen_executed = 0
+
+
+
+
+function! <SID>SetDefaultValues(dParams, dDefParams)
+   let l:dParams = a:dParams
+
+   for l:sKey in keys(a:dDefParams)
+      if (!has_key(l:dParams, l:sKey))
+         let l:dParams[ l:sKey ] = a:dDefParams[ l:sKey ]
+      endif
+   endfor
+
+   return l:dParams
+endfunction
 
 
 " задаем пустые массивы с данными
@@ -42,17 +59,19 @@ function! vimprj#init()
    let g:vimprj#dFiles = {}
    let g:vimprj#iCurFileNum = 0
    let g:vimprj#sCurVimprjKey = 'default'
-   "  g:vimprj#sCurVimprjKey устанавливается позднее (хотя, может, это и не
-   "  обязательно)
+
+   " -- hooks --
+   "
+   " NeedSkipBuffer
+
+
    let g:vimprj#dHooks = {
-            \     'NeedSkipBuffer'      : {},
-            \     'OnAddNewVimprjRoot'  : {},
-            \     'SetDefaultOptions'   : {},
-            \     'OnAddFile'           : {},
-            \     'OnFileOpen'          : {},
-            \     'ApplyVimprjSettings_after' : {},
-            \  
-            \     'onTest'              : {},
+            \     'NeedSkipBuffer'       : {},
+            \     'OnAddNewVimprjRoot'   : {},
+            \     'SetDefaultOptions'    : {},
+            \     'OnAddFile'            : {},
+            \     'OnFileOpen'           : {},
+            \     'ApplySettingsForFile' : {},
             \  }
 
    " запоминаем начальные &path
@@ -74,33 +93,67 @@ function! vimprj#init()
 
    let s:boolInitialized = 1
 
-   "function! g:vimprj#dHooks['OnAddNewVimprjRoot']['test'](dParams)
-      "return 2
-   "endfunction
+endfunction
 
-   "function! g:vimprj#dHooks['OnAddNewVimprjRoot']['test2'](dParams)
-      "return {'as' : 'fg'}
-   "endfunction
 
-   "echo g:vimprj#dHooks
+" Парсит директорию проекта (директорию, в которой лежит директория .vimprj)
+" Добавляет новый vimprj_root
+"
+" @param sProjectRoot path to proj dir
+" @param dParams dictionary with params:
+"     'boolSwitchBackToCurVimprj' : if 1, then after parsing will be executed
+"        vimprj#applyVimprjSettings for current project
+"        (default: 0)
+"
+function! vimprj#parseNewVimprjRoot(sProjectRoot, dParams)
+
+   " set default params
+   let l:dParams = <SID>SetDefaultValues(a:dParams, {
+            \     'boolSwitchBackToCurVimprj' : 0,
+            \  })
+
+   let l:sVimprjDirName = a:sProjectRoot.'/'.g:vimprj_dirNameForSearch
+
+   " if dir .vimprj exists, and if this vimprj_root has not been parsed yet 
+
+   if isdirectory(l:sVimprjDirName)
+      let l:sVimprjKey = <SID>GetKeyFromPath(a:sProjectRoot)
+      if !has_key(g:vimprj#dRoots, l:sVimprjKey)
+
+
+         call <SID>SourceVimprjFiles(l:sVimprjDirName)
+         call <SID>ChangeDirToVimprj(substitute(a:sProjectRoot, ' ', '\\ ', 'g'))
+
+         call <SID>AddNewVimprjRoot(l:sVimprjKey, a:sProjectRoot, a:sProjectRoot)
+
+
+         if l:dParams['boolSwitchBackToCurVimprj']
+            call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey)
+         endif
+      endif
+   else
+      echoerr "vimprj#parseNewVimprjRoot error: there's no ".g:vimprj_dirNameForSearch
+               \  ." dir in the project dir '".a:sProjectRoot."'"
+   endif
 
 endfunction
+
 
 function! <SID>CreateDefaultProjectIfNotAlready()
    if !has_key(g:vimprj#dRoots, "default")
       " создаем дефолтный "проект"
       call <SID>AddNewVimprjRoot("default", "", getcwd())
       call <SID>AddFile(0, 'default')
-      "x3, надо ли послед.строчка
-      "let g:vimprj#sCurVimprjKey = "default"  
    endif
 endfunction
 
-function! <SID>AddFile(iBufNum, sVimprjKey)
-   "call confirm('AddFile '.a:iBufNum.' '.a:sVimprjKey)
+function! <SID>AddFile(iFileNum, sVimprjKey)
+   "call confirm('AddFile '.a:iFileNum.' '.a:sVimprjKey)
 
-   let g:vimprj#dFiles[ a:iBufNum ] = {'sVimprjKey' : a:sVimprjKey}
-   call <SID>ExecHooks('OnAddFile', {'iBufNum' : a:iBufNum, 'sVimprjKey' : a:sVimprjKey})
+   let g:vimprj#dFiles[ a:iFileNum ] = {'sVimprjKey' : a:sVimprjKey}
+   call <SID>ExecHooks('OnAddFile', {
+            \     'iFileNum'   : a:iFileNum,
+            \  })
 endfunction
 
 
@@ -111,11 +164,7 @@ function! <SID>SetCurrentFile(iFileNum)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __SetCurrentFile__', {'filename' : expand('<afile>')})
 
-   if has_key(g:vimprj#dFiles, a:iFileNum)
-      let g:vimprj#iCurFileNum = a:iFileNum
-   else
-      let g:vimprj#iCurFileNum = 0
-   endif
+   let g:vimprj#iCurFileNum   = a:iFileNum
    let g:vimprj#sCurVimprjKey = g:vimprj#dFiles[ g:vimprj#iCurFileNum ].sVimprjKey
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __SetCurrentFile__', {'text' : ('g:vimprj#iCurFileNum='.g:vimprj#iCurFileNum.'; g:vimprj#sCurVimprjKey='.g:vimprj#sCurVimprjKey)})
@@ -162,39 +211,27 @@ function! <SID>ExecHooks(sHooksgroup, dParams)
    return l:lRetValues
 endfunction
 
-"call <SID>ExecHooks('OnAddNewVimprjRoot', {})
-
-"function! vimprj#test(sKey)
-   "let g:vimprj#dRoots[a:sKey] = {}
-   "let g:vimprj#dRoots[a:sKey].test = "qwe"
-   "call <SID>ExecHooks('onTest', {'sKey' : a:sKey})
-"endfunction
-
-"function! g:vimprj#dHooks.onTest.first(dParams)
-   "echo a:dParams
-"endfunction
-
 
 " добавляет новый vimprj root, заполняет его текущими параметрами
 "
 " ВНИМАНИЕ! "текущими" параметрами - это означает, что на момент вызова
 " этого метода все .vim файлы из .vimprj уже должны быть выполнены!
-function! <SID>AddNewVimprjRoot(sKey, sPath, sCdPath)
+function! <SID>AddNewVimprjRoot(sVimprjKey, sPath, sCdPath)
 
-   if !has_key(g:vimprj#dRoots, a:sKey)
+   if !has_key(g:vimprj#dRoots, a:sVimprjKey)
 
-      call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __AddNewVimprjRoot__', {'sKey' : a:sKey, 'sPath' : a:sPath, 'sCdPath' : a:sCdPath})
+      call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __AddNewVimprjRoot__', {'sVimprjKey' : a:sVimprjKey, 'sPath' : a:sPath, 'sCdPath' : a:sCdPath})
 
-      let g:vimprj#dRoots[a:sKey] = {}
-      let g:vimprj#dRoots[a:sKey]["cd_path"] = a:sCdPath
-      let g:vimprj#dRoots[a:sKey]["proj_root"] = a:sPath
+      let g:vimprj#dRoots[a:sVimprjKey] = {}
+      let g:vimprj#dRoots[a:sVimprjKey]["cd_path"] = a:sCdPath
+      let g:vimprj#dRoots[a:sVimprjKey]["proj_root"] = a:sPath
       if (!empty(a:sPath))
-         let g:vimprj#dRoots[a:sKey]["path"] = a:sPath.'/'.g:vimprj_dirNameForSearch
+         let g:vimprj#dRoots[a:sVimprjKey]["path"] = a:sPath.'/'.g:vimprj_dirNameForSearch
       else
-         let g:vimprj#dRoots[a:sKey]["path"] = ""
+         let g:vimprj#dRoots[a:sVimprjKey]["path"] = ""
       endif
 
-      call <SID>ExecHooks('OnAddNewVimprjRoot', {'sKey' : a:sKey})
+      call <SID>ExecHooks('OnAddNewVimprjRoot', {'sVimprjKey' : a:sVimprjKey})
 
       call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __AddNewVimprjRoot__', {})
    endif
@@ -202,7 +239,7 @@ endfunction
 
 
 " applies all settings from .vimprj dir
-function! vimprj#applyVimprjSettings(sVimprjKey, iFileNum)
+function! vimprj#applyVimprjSettings(sVimprjKey)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __ApplyVimprjSettings__', {'sVimprjKey' : a:sVimprjKey})
 
@@ -215,11 +252,6 @@ function! vimprj#applyVimprjSettings(sVimprjKey, iFileNum)
    call <SID>SourceVimprjFiles(g:vimprj#dRoots[ a:sVimprjKey ]["path"])
    call <SID>ChangeDirToVimprj(g:vimprj#dRoots[ a:sVimprjKey ]["cd_path"])
 
-
-   call <SID>ExecHooks('ApplyVimprjSettings_after', {
-            \     'sVimprjKey' : a:sVimprjKey,
-            \     'iFileNum'   : a:iFileNum,
-            \  })
 
    "let l:sTmp .= "===".&ts
    "let l:tmp2 = input(l:sTmp)
@@ -267,7 +299,7 @@ endfunction
 function! <SID>SourceVimprjFiles(sPath)
    "call confirm("sourcing files from: ". a:sPath)
    
-   call <SID>ExecHooks('SetDefaultOptions', {'sDirName' : a:sPath})
+   call <SID>ExecHooks('SetDefaultOptions', {'sVimprjDirName' : a:sPath})
 
    if (!empty(a:sPath))
       " sourcing all *vim files in .vimprj dir
@@ -352,19 +384,22 @@ function! <SID>OnFileOpen()
    call <SID>AddFile(l:iFileNum, l:sVimprjKey)
 
    if !has_key(g:vimprj#dRoots, l:sVimprjKey)
-      " adding
+      " .vimprj project is NOT known.
+      " adding.
 
-      " sourcing all *vim files in .vimprj dir
+      call vimprj#parseNewVimprjRoot(l:sProjectRoot, {
+               \     'boolSwitchBackToCurVimprj' : 0,
+               \  })
 
-      call <SID>SourceVimprjFiles(l:sProjectRoot.'/'.g:vimprj_dirNameForSearch)
-      call <SID>ChangeDirToVimprj(substitute(l:sProjectRoot, ' ', '\\ ', 'g'))
+      "call <SID>SourceVimprjFiles(l:sProjectRoot.'/'.g:vimprj_dirNameForSearch)
+      "call <SID>ChangeDirToVimprj(substitute(l:sProjectRoot, ' ', '\\ ', 'g'))
 
-      call <SID>AddNewVimprjRoot(l:sVimprjKey, l:sProjectRoot, l:sProjectRoot)
+      "call <SID>AddNewVimprjRoot(l:sVimprjKey, l:sProjectRoot, l:sProjectRoot)
    else
       " .vimprj project is known.
       " if it is inactive - applying settings from it.
       if l:sVimprjKey != g:vimprj#sCurVimprjKey
-         call vimprj#applyVimprjSettings(l:sVimprjKey, l:iFileNum)
+         call vimprj#applyVimprjSettings(l:sVimprjKey)
       endif
 
    endif
@@ -375,23 +410,13 @@ function! <SID>OnFileOpen()
 
    call <SID>SetCurrentFile(l:iFileNum)
 
-   " here we pass g:vimprj#sCurVimprjKey, g:vimprj#iCurFileNum
-   " because they are just modified by SetCurrentFile
-
    call <SID>ExecHooks('OnFileOpen', {
-            \     'sVimprjKey' : l:sVimprjKey,
             \     'iFileNum'   : l:iFileNum,
             \  })
 
-   call <SID>ExecHooks('ApplyVimprjSettings_after', {
-            \     'sVimprjKey' : l:sVimprjKey,
+   call <SID>ExecHooks('ApplySettingsForFile', {
             \     'iFileNum'   : l:iFileNum,
             \  })
-
-   " НЕ НАДО: для того, чтобы при входе в OnBufEnter сработал IsBufSwitched, ставим
-   " текущий номер буфера в 0
-   "let g:vimprj#iCurFileNum = 0
-   "let g:vimprj#sCurVimprjKey = "default"
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnFileOpen__', {})
 endfunction
@@ -399,6 +424,10 @@ endfunction
 " returns if buffer is changed (swithed) to another, or not
 function! <SID>IsBufSwitched()
    return (g:vimprj#iCurFileNum != bufnr('%'))
+endfunction
+
+function! vimprj#getVimprjKeyOfFile(iFileNum)
+   return g:vimprj#dFiles[ a:iFileNum ]['sVimprjKey']
 endfunction
 
 
@@ -428,8 +457,13 @@ function! <SID>OnBufEnter()
 
    " applying vimprj settings if only vimprj root changed
    if l:sPrevVimprjKey != g:vimprj#sCurVimprjKey
-      call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey, l:iFileNum)
+      call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey)
    endif
+
+   call <SID>ExecHooks('ApplySettingsForFile', {
+            \     'iFileNum'   : l:iFileNum,
+            \  })
+
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function end: __OnBufEnter__', {})
 
