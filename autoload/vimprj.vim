@@ -7,7 +7,7 @@ endif
 
 
 
-let g:vimprj#version           = 100
+let g:vimprj#version           = 101
 let g:vimprj#loaded            = 0
 
 let s:boolInitialized          = 0
