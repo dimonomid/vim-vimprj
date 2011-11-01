@@ -229,15 +229,18 @@ function! <SID>ExecHooks(sHooksgroup, dParams)
       silent! let l:dParams['dVimprjRootParams'] = 
                   \  g:vimprj#dRoots[g:vimprj#sCurVimprjKey][ l:sKey ]
 
-      try
-         call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](l:dParams))
-      catch
-         " workaround for old buggy Vim version.
-         " don't know what exactly version contains fix for this.
+      "try
+         "call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](l:dParams))
+      "catch
+
+         "" workaround for old buggy Vim version.
+         "" don't know what exactly version contains fix for this.
+
          let l:tmp = g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](l:dParams)
          call add(l:lRetValues, l:tmp)
          unlet l:tmp
-      endtry
+
+      "endtry
 
       silent! unlet l:dParams['dVimprjRootParams']
 
