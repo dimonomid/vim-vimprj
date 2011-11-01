@@ -7,7 +7,7 @@ endif
 
 
 
-let g:vimprj#version           = 101
+let g:vimprj#version           = 102
 let g:vimprj#loaded            = 0
 
 let s:boolInitialized          = 0
@@ -29,11 +29,26 @@ function! <SID>IsAbsolutePath(path)
 endfunction " >>>
 
 
+" acts like bufname({expr}), but always return absolute path
 function! <SID>BufName(mValue)
    let l:sFilename = bufname(a:mValue)
+
+   " make absolute path
    if !empty(l:sFilename) && !<SID>IsAbsolutePath(l:sFilename)
       let l:sFilename = getcwd().'/'.l:sFilename
    endif
+
+   " on Windows systems happens stupid things: bufname returns path without
+   " drive letter, e.g. something like that: "/path/to/file", but it should be
+   " "D:/path/to/file". So, we need to add drive letter manually.
+   if has('win32') || has('win64')
+      if strpart(l:sFilename, 0, 1) == '/' && strpart(getcwd(), 1, 1) == ':'
+         let l:sFilename = strpart(getcwd(), 0, 2).l:sFilename
+      endif
+   endif
+
+   " simplify
+   let l:sFilename = simplify(l:sFilename)
 
    return l:sFilename
 endfunction
@@ -105,14 +120,14 @@ function! vimprj#init()
    augroup Vimprj_LoadFile
       autocmd! Vimprj_LoadFile BufReadPost
       autocmd! Vimprj_LoadFile BufNewFile
-      autocmd Vimprj_LoadFile BufReadPost * call <SID>OnFileOpen()
-      autocmd Vimprj_LoadFile BufNewFile * call <SID>OnFileOpen()
+      autocmd Vimprj_LoadFile BufReadPost * call <SID>OnFileOpen(bufnr(expand('<afile>')))
+      autocmd Vimprj_LoadFile BufNewFile * call <SID>OnFileOpen(bufnr(expand('<afile>')))
    augroup END
 
    " указываем обработчик входа в другой буфер: OnBufEnter
    augroup Vimprj_BufEnter
       autocmd! Vimprj_BufEnter BufEnter
-      autocmd Vimprj_BufEnter BufEnter * call <SID>OnBufEnter()
+      autocmd Vimprj_BufEnter BufEnter * call <SID>OnBufEnter(bufnr(expand('<afile>')))
    augroup END
 
    augroup Vimprj_BufWritePost
@@ -184,7 +199,19 @@ endfunction
 function! <SID>AddFile(iFileNum, sVimprjKey)
    "call confirm('AddFile '.a:iFileNum.' '.a:sVimprjKey)
 
-   let g:vimprj#dFiles[ a:iFileNum ] = {'sVimprjKey' : a:sVimprjKey}
+   if !has_key(g:vimprj#dFiles, a:iFileNum)
+      let g:vimprj#dFiles[ a:iFileNum ] = {}
+   endif
+
+   if a:iFileNum > 0
+      let l:sFilename = <SID>BufName(a:iFileNum)
+   else
+      let l:sFilename = ""
+   endif
+   
+   let g:vimprj#dFiles[ a:iFileNum ]['sVimprjKey'] = a:sVimprjKey
+   let g:vimprj#dFiles[ a:iFileNum ]['sFilename']  = l:sFilename
+
    call <SID>ExecHooks('OnAddFile', {
             \     'iFileNum'   : a:iFileNum,
             \  })
@@ -336,7 +363,7 @@ function! <SID>NeedSkipBuffer(iFileNum)
 endfunction
 
 function! <SID>SourceVimprjFiles(sPath)
-   "call confirm("sourcing files from: ". a:sPath)
+   call confirm("sourcing files from: ". a:sPath)
    
    call <SID>ExecHooks('SetDefaultOptions', {'sVimprjDirName' : a:sPath})
 
@@ -408,11 +435,20 @@ function! <SID>GetVimprjRootOfFile(iFileNum)
       endif
    endif
 
-   return l:sProjectRoot
+   if !empty(l:sProjectRoot)
+      let l:sVimprjKey = <SID>GetKeyFromPath(l:sProjectRoot)
+   else
+      let l:sVimprjKey = "default"
+   endif
+
+   return      {
+            \     'sProjectRoot' : l:sProjectRoot,
+            \     'sVimprjKey'   : l:sVimprjKey,
+            \  }
 
 endfunction
 
-function! <SID>OnFileOpen()
+function! <SID>OnFileOpen(iFileNum)
 
    let l:iFileNum = bufnr(expand('<afile>'))
 
@@ -433,13 +469,12 @@ function! <SID>OnFileOpen()
    " dirname will be /path/to/dir/.vimprj/tags
 
    " ищем .vimprj
-   let l:sProjectRoot = <SID>GetVimprjRootOfFile(l:iFileNum)
+   let l:dTmp = <SID>GetVimprjRootOfFile(l:iFileNum)
 
-   if !empty(l:sProjectRoot)
-      let l:sVimprjKey = <SID>GetKeyFromPath(l:sProjectRoot)
-   else
-      let l:sVimprjKey = "default"
-   endif
+   let l:sVimprjKey   = l:dTmp['sVimprjKey']
+   let l:sProjectRoot = l:dTmp['sProjectRoot']
+
+   unlet l:dTmp
 
    " if this .vimprj project is not known yet, then adding it.
    " otherwise just applying settings, if necessary.
@@ -471,18 +506,21 @@ function! <SID>OnFileOpen()
    endif
 
 
-
-   "let g:vimprj#dFiles[ a:iBufNum ]['justAdded'] = 1
-
    call <SID>SetCurrentFile(l:iFileNum)
 
    call <SID>ExecHooks('OnFileOpen', {
             \     'iFileNum'   : l:iFileNum,
             \  })
 
-   call <SID>ExecHooks('ApplySettingsForFile', {
-            \     'iFileNum'   : l:iFileNum,
-            \  })
+   if l:iFileNum == bufnr('%')
+      call <SID>ExecHooks('ApplySettingsForFile', {
+               \     'iFileNum'   : l:iFileNum,
+               \  })
+   else
+      " need to switch back to %
+      " (at least, it happens when ":w new_filename" at any NAMED file)
+      call <SID>OnBufEnter(bufnr('%'))
+   endif
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnFileOpen__', {})
 endfunction
@@ -497,8 +535,8 @@ function! vimprj#getVimprjKeyOfFile(iFileNum)
 endfunction
 
 
-function! <SID>OnBufEnter()
-   let l:iFileNum = bufnr(expand('<afile>'))
+function! <SID>OnBufEnter(iFileNum)
+   let l:iFileNum = a:iFileNum
 
    call <SID>CreateDefaultProjectIfNotAlready()
 
@@ -513,7 +551,7 @@ function! <SID>OnBufEnter()
    endif
 
    if empty(s:bool_OnFileOpen_executed)
-      call <SID>OnFileOpen()
+      call <SID>OnFileOpen(l:iFileNum)
    endif
 
    "let l:sTmp = input("OnBufWinEnter_".getbufvar('%', "&buftype"))
@@ -538,20 +576,27 @@ endfunction
 function! <SID>OnBufSave()
    let l:iFileNum = bufnr(expand('<afile>'))
 
-   if has_key(g:vimprj#dFiles, l:iFileNum)
+   if !has_key(g:vimprj#dFiles, l:iFileNum)
+      " saving file that wasn't parsed yet
+      " (like  ":w new_filename" on any named or [No Name] file)
 
-      " тут нужно искать vimprj root для нового имени файла,
-      " с пом-ю <SID>GetVimprjRootOfFile
-      " 
-      " и так далее.
-
-      call <SID>ExecHooks('OnBufSave', {
-               \     'iFileNum'   : l:iFileNum,
-               \  })
+      call <SID>OnFileOpen(l:iFileNum)
    else
-      " this may happen when saving file with another filename by command:
-      "     :w new_filename
-      " NOTE: this isn't the same as   :saveas new_filename
+
+      if g:vimprj#dFiles[ l:iFileNum ]['sFilename'] != <SID>BufName(l:iFileNum)
+         " file is just renamed/moved
+         " (like ":saveas new_filename")
+
+         "call confirm('renamed. previous="'.g:vimprj#dFiles[ l:iFileNum ]['sFilename'].'" current="'.<SID>BufName(l:iFileNum).'"')
+         call <SID>OnFileOpen(l:iFileNum)
+
+      else
+         " usual file save
+         call <SID>ExecHooks('OnBufSave', {
+                  \     'iFileNum'   : l:iFileNum,
+                  \  })
+      endif
+
    endif
 endfunction
 
