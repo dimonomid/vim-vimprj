@@ -107,7 +107,7 @@ function! vimprj#init()
             \     'NeedSkipBuffer'       : {},
             \     'OnAddNewVimprjRoot'   : {},
             \     'SetDefaultOptions'    : {},
-            \     'OnAddFile'            : {},
+            \     'OnTakeAccountOfFile'  : {},
             \     'OnFileOpen'           : {},
             \     'OnBufSave'            : {},
             \     'ApplySettingsForFile' : {},
@@ -192,12 +192,12 @@ function! <SID>CreateDefaultProjectIfNotAlready()
    if !has_key(g:vimprj#dRoots, "default")
       " создаем дефолтный "проект"
       call <SID>AddNewVimprjRoot("default", "", getcwd())
-      call <SID>AddFile(0, 'default')
+      call <SID>TakeAccountOfFile(0, 'default')
    endif
 endfunction
 
-function! <SID>AddFile(iFileNum, sVimprjKey)
-   "call confirm('AddFile '.a:iFileNum.' '.a:sVimprjKey)
+function! <SID>TakeAccountOfFile(iFileNum, sVimprjKey)
+   "call confirm('TakeAccountOfFile '.a:iFileNum.' '.a:sVimprjKey)
 
    if !has_key(g:vimprj#dFiles, a:iFileNum)
       let g:vimprj#dFiles[ a:iFileNum ] = {}
@@ -212,7 +212,7 @@ function! <SID>AddFile(iFileNum, sVimprjKey)
    let g:vimprj#dFiles[ a:iFileNum ]['sVimprjKey'] = a:sVimprjKey
    let g:vimprj#dFiles[ a:iFileNum ]['sFilename']  = l:sFilename
 
-   call <SID>ExecHooks('OnAddFile', {
+   call <SID>ExecHooks('OnTakeAccountOfFile', {
             \     'iFileNum'   : a:iFileNum,
             \  })
 endfunction
@@ -363,7 +363,7 @@ function! <SID>NeedSkipBuffer(iFileNum)
 endfunction
 
 function! <SID>SourceVimprjFiles(sPath)
-   call confirm("sourcing files from: ". a:sPath)
+   "call confirm("sourcing files from: ". a:sPath)
    
    call <SID>ExecHooks('SetDefaultOptions', {'sVimprjDirName' : a:sPath})
 
@@ -479,7 +479,7 @@ function! <SID>OnFileOpen(iFileNum)
    " if this .vimprj project is not known yet, then adding it.
    " otherwise just applying settings, if necessary.
 
-   call <SID>AddFile(l:iFileNum, l:sVimprjKey)
+   call <SID>TakeAccountOfFile(l:iFileNum, l:sVimprjKey)
 
    if !has_key(g:vimprj#dRoots, l:sVimprjKey)
       " .vimprj project is NOT known.
