@@ -28,6 +28,10 @@ function! <SID>IsAbsolutePath(path)
    return 0
 endfunction " >>>
 
+function! <SID>_GetPathHeader(sPath)
+   return substitute(a:sPath, '\v^(.*)[\\/]([^\\/]+)[\\/]{0,1}$', '\1', '')
+endfunction
+
 
 " acts like bufname({expr}), but always return absolute path
 function! <SID>BufName(mValue)
@@ -401,12 +405,14 @@ endfunction
 function! <SID>GetVimprjRootOfFile(iFileNum)
 
    let l:sFilename = <SID>BufName(a:iFileNum) "expand('<afile>:p:h')
+   let l:sFilename = <SID>_GetPathHeader(l:sFilename)
 
    let l:i = 0
    let l:sCurPath = ''
    let l:sProjectRoot = ''
    while (l:i < g:vimprj_recurseUpCount)
-      if (isdirectory(l:sFilename.l:sCurPath.'/'.g:vimprj_dirNameForSearch))
+      let l:sTmp = simplify(l:sFilename.l:sCurPath.'/'.g:vimprj_dirNameForSearch)
+      if (isdirectory(l:sTmp))
          let l:sProjectRoot = simplify(l:sFilename.l:sCurPath)
          break
       endif
@@ -450,7 +456,7 @@ endfunction
 
 function! <SID>OnFileOpen(iFileNum)
 
-   let l:iFileNum = bufnr(expand('<afile>'))
+   let l:iFileNum = a:iFileNum "bufnr(expand('<afile>'))
 
 
    call <SID>CreateDefaultProjectIfNotAlready()
