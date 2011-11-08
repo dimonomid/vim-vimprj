@@ -64,6 +64,10 @@ function! <SID>SetDefaultValues(dParams, dDefParams)
    for l:sKey in keys(a:dDefParams)
       if (!has_key(l:dParams, l:sKey))
          let l:dParams[ l:sKey ] = a:dDefParams[ l:sKey ]
+      else
+         if type(l:dParams[ l:sKey ]) == type({}) && type(a:dDefParams[ l:sKey ]) == type({})
+            let l:dParams[ l:sKey ] = <SID>SetDefaultValues(l:dParams[ l:sKey ], a:dDefParams[ l:sKey ])
+         endif
       endif
    endfor
 
