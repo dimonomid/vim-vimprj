@@ -8,7 +8,7 @@ endif
 
 
 let g:vimprj#version           = 102
-let g:vimprj#loaded            = 0
+let g:vimprj#loaded            = 1
 
 let s:boolInitialized          = 0
 let s:bool_OnFileOpen_executed = 0
