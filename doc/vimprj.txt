@@ -147,3 +147,4 @@ KNOWN BUGS                                                  *vimprj-bugs*
 
 None.
 
+ vim:ft=help:tw=78:  
