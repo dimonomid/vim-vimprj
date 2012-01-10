@@ -18,6 +18,13 @@ let s:bool_OnFileOpen_executed = 0
 "                                          PUBLIC FUNCTIONS
 " ************************************************************************************************
 
+function! vimprj#info()
+   let l:sProjectRoot = g:vimprj#dRoots[ g:vimprj#sCurVimprjKey ].proj_root
+   echo '* Project root: '
+            \  .(l:sProjectRoot != '' ? l:sProjectRoot : 'not found')
+            \  .'  (Project root is a directory which contains "'
+            \  .g:vimprj_dirNameForSearch.'" directory or file)'
+endfunction
 
 " applies all settings from .vimprj dir
 function! vimprj#applyVimprjSettings(sVimprjKey)
