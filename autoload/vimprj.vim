@@ -100,7 +100,7 @@ function! vimprj#init()
       autocmd! Vimprj_LoadFile BufReadPost
       autocmd! Vimprj_LoadFile BufNewFile
       autocmd Vimprj_LoadFile BufReadPost * call <SID>OnFileOpen(bufnr(expand('<afile>')))
-      autocmd Vimprj_LoadFile BufNewFile * call <SID>OnFileOpen(bufnr(expand('<afile>')))
+      autocmd Vimprj_LoadFile BufNewFile *  call <SID>OnFileOpen(bufnr(expand('<afile>')))
    augroup END
 
    " указываем обработчик входа в другой буфер: OnBufEnter
@@ -346,6 +346,11 @@ function! <SID>NeedSkipBuffer(iFileNum)
       "return 1
    "endif
 
+   " skip directories
+   if isdirectory(bufname(a:iFileNum))
+      return 1
+   endif
+   
    " &buftype should be empty for regular files
    if !empty(getbufvar(a:iFileNum, "&buftype"))
       return 1
@@ -527,7 +532,14 @@ function! <SID>OnFileOpen(iFileNum)
    else
       " need to switch back to %
       " (at least, it happens when ":w new_filename" at any NAMED file)
-      call <SID>OnBufEnter(bufnr('%'))
+
+      if <SID>IsFileAccountTaken(bufnr('%'))
+         call <SID>OnBufEnter(bufnr('%'))
+      else
+         " for some reason (i dunno) it happens when from default project open
+         " [BufExplorer].
+         call <SID>OnFileOpen(bufnr('%'))
+      endif
    endif
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnFileOpen__', {})
@@ -536,6 +548,10 @@ endfunction
 " returns if buffer is changed (swithed) to another, or not
 function! <SID>IsBufSwitched()
    return (g:vimprj#iCurFileNum != bufnr('%'))
+endfunction
+
+function! <SID>IsFileAccountTaken(iFileNum)
+   return has_key(g:vimprj#dFiles, a:iFileNum)
 endfunction
 
 
