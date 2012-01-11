@@ -338,10 +338,13 @@ endfunction
 " for it)
 function! <SID>NeedSkipBuffer(iFileNum)
 
-   " file should be readable
-   if !filereadable(bufname(a:iFileNum))
-      return 1
-   endif
+   " COMMENTED!! file should be readable 
+   " commented because of we should parse creation of new files,
+   " which isn't readable at BufNewFile.
+   "
+   "if !filereadable(bufname(a:iFileNum))
+      "return 1
+   "endif
 
    " &buftype should be empty for regular files
    if !empty(getbufvar(a:iFileNum, "&buftype"))
