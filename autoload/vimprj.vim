@@ -11,7 +11,7 @@ let g:vimprj#version           = 103
 let g:vimprj#loaded            = 1
 
 let s:boolInitialized          = 0
-let s:bool_OnFileOpen_executed = 0
+"let s:bool_OnFileOpen_executed = 0
 
 
 " ************************************************************************************************
@@ -480,7 +480,7 @@ function! <SID>OnFileOpen(iFileNum)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __OnFileOpen__', {'filename' : expand('%')})
 
-   let s:bool_OnFileOpen_executed = 1
+   "let s:bool_OnFileOpen_executed = 1
 
    "let l:sTmp = input("OnNewFileOpened_".getbufvar('%', "&buftype"))
 
@@ -533,13 +533,19 @@ function! <SID>OnFileOpen(iFileNum)
       " need to switch back to %
       " (at least, it happens when ":w new_filename" at any NAMED file)
 
-      if <SID>IsFileAccountTaken(bufnr('%'))
-         call <SID>OnBufEnter(bufnr('%'))
-      else
-         " for some reason (i dunno) it happens when from default project open
-         " [BufExplorer].
-         call <SID>OnFileOpen(bufnr('%'))
-      endif
+      "echoerr "returning to buffer ".bufname('%')." from ".bufname(l:iFileNum)
+
+      call <SID>OnBufEnter(bufnr('%'))
+
+
+
+      "if <SID>IsFileAccountTaken(bufnr('%'))
+         "call <SID>OnBufEnter(bufnr('%'))
+      "else
+         "" for some reason (i dunno) it happens when from default project open
+         "" [BufExplorer].
+         "call <SID>OnFileOpen(bufnr('%'))
+      "endif
    endif
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function end: __OnFileOpen__', {})
@@ -570,9 +576,14 @@ function! <SID>OnBufEnter(iFileNum)
       return
    endif
 
-   if empty(s:bool_OnFileOpen_executed)
+   if !<SID>IsFileAccountTaken(l:iFileNum)
+      "echoerr "not taken account of ".bufname(l:iFileNum)
       call <SID>OnFileOpen(l:iFileNum)
    endif
+
+   "if empty(s:bool_OnFileOpen_executed)
+      "call <SID>OnFileOpen(l:iFileNum)
+   "endif
 
    "let l:sTmp = input("OnBufWinEnter_".getbufvar('%', "&buftype"))
 
