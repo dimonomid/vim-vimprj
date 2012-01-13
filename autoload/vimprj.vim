@@ -7,7 +7,7 @@ endif
 
 
 
-let g:vimprj#version           = 103
+let g:vimprj#version           = 104
 let g:vimprj#loaded            = 1
 
 let s:boolInitialized          = 0
@@ -31,15 +31,8 @@ function! vimprj#applyVimprjSettings(sVimprjKey)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __ApplyVimprjSettings__', {'sVimprjKey' : a:sVimprjKey})
 
-
-   " TODO
-   "if (!empty(s:indexer_defaultSettingsFilename))
-   "    exec 'source '.s:indexer_defaultSettingsFilename
-   "endif
-
    call <SID>SourceVimprjFiles(g:vimprj#dRoots[ a:sVimprjKey ]["path"])
    call <SID>ChangeDirToVimprj(g:vimprj#dRoots[ a:sVimprjKey ]["cd_path"])
-
 
    " для каждого проекта, в который входит файл, добавляем tags и path
 
@@ -492,6 +485,10 @@ function! <SID>OnFileOpen(iFileNum)
 
    let l:sVimprjKey   = l:dTmp['sVimprjKey']
    let l:sProjectRoot = l:dTmp['sProjectRoot']
+
+   "if <SID>IsFileAccountTaken(l:iFileNum)
+      "call confirm('file account is already taken '.<SID>BufName(l:iFileNum))
+   "endif
 
    unlet l:dTmp
 
