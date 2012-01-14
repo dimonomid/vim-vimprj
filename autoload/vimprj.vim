@@ -7,11 +7,10 @@ endif
 
 
 
-let g:vimprj#version           = 104
+let g:vimprj#version           = 105
 let g:vimprj#loaded            = 1
 
 let s:boolInitialized          = 0
-"let s:bool_OnFileOpen_executed = 0
 
 
 " ************************************************************************************************
@@ -30,6 +29,7 @@ endfunction
 function! vimprj#applyVimprjSettings(sVimprjKey)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __ApplyVimprjSettings__', {'sVimprjKey' : a:sVimprjKey})
+   "call confirm ("vimprj#applyVimprjSettings ".a:sVimprjKey)
 
    call <SID>SourceVimprjFiles(g:vimprj#dRoots[ a:sVimprjKey ]["path"])
    call <SID>ChangeDirToVimprj(g:vimprj#dRoots[ a:sVimprjKey ]["cd_path"])
@@ -464,6 +464,8 @@ function! <SID>OnFileOpen(iFileNum)
 
    let l:iFileNum = a:iFileNum "bufnr(expand('<afile>'))
 
+   "call confirm("OnFileOpen " . a:iFileNum . " " . bufname(a:iFileNum))
+
 
    call <SID>CreateDefaultProjectIfNotAlready()
 
@@ -473,7 +475,6 @@ function! <SID>OnFileOpen(iFileNum)
 
    call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __OnFileOpen__', {'filename' : expand('%')})
 
-   "let s:bool_OnFileOpen_executed = 1
 
    "let l:sTmp = input("OnNewFileOpened_".getbufvar('%', "&buftype"))
 
@@ -485,6 +486,9 @@ function! <SID>OnFileOpen(iFileNum)
 
    let l:sVimprjKey   = l:dTmp['sVimprjKey']
    let l:sProjectRoot = l:dTmp['sProjectRoot']
+
+   " if file account is already taken, we should anyway parse it again,
+   " because it happens at least at :saveas new_filename
 
    "if <SID>IsFileAccountTaken(l:iFileNum)
       "call confirm('file account is already taken '.<SID>BufName(l:iFileNum))
@@ -567,6 +571,8 @@ function! <SID>OnBufEnter(iFileNum)
       return
    endif
 
+   "call confirm("OnBufEnter " . a:iFileNum . " " . bufname(a:iFileNum))
+
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __OnBufEnter__', {'filename' : expand('%')})
 
    if (!<SID>IsBufSwitched())
@@ -577,12 +583,6 @@ function! <SID>OnBufEnter(iFileNum)
       "echoerr "not taken account of ".bufname(l:iFileNum)
       call <SID>OnFileOpen(l:iFileNum)
    endif
-
-   "if empty(s:bool_OnFileOpen_executed)
-      "call <SID>OnFileOpen(l:iFileNum)
-   "endif
-
-   "let l:sTmp = input("OnBufWinEnter_".getbufvar('%', "&buftype"))
 
    let l:sPrevVimprjKey = g:vimprj#sCurVimprjKey
    call <SID>SetCurrentFile(l:iFileNum)
