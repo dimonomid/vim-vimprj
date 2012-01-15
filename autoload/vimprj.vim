@@ -445,7 +445,7 @@ function! <SID>GetVimprjRootOfFile(iFileNum)
       " проверяем, не открыли ли мы файл из директории .vimprj (или, если это
       " файл, то не открыли ли мы этот файл)
 
-      "let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
+      let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
       "let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
 
       "if strpart(l:sFilename, 0, l:iPathToDNFSlen) == l:sPathToDirNameForSearch " открытый файл - из директории .vimprj, так что для него
