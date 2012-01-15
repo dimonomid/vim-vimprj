@@ -115,6 +115,14 @@ endfunction
 "                                       PRIVATE FUNCTIONS
 " ************************************************************************************************
 
+function! <SID>IsFileInSubdir(sFilename, sDirname)
+   let l:sDirname = expand(a:sDirname)
+   let l:sFilename = expand(a:sFilename)
+
+   let l:iPathToDirLen = strlen(l:sDirname)
+
+   return (strpart(l:sFilename, 0, l:iPathToDirLen) == l:sDirname)
+endfunction
 
 " <SID>IsAbsolutePath(path) <<<
 "   this function from project.vim is written by Aric Blumer.
@@ -437,10 +445,12 @@ function! <SID>GetVimprjRootOfFile(iFileNum)
       " проверяем, не открыли ли мы файл из директории .vimprj (или, если это
       " файл, то не открыли ли мы этот файл)
 
-      let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
-      let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
+      "let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
+      "let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
 
-      if strpart(l:sFilename, 0, l:iPathToDNFSlen) == l:sPathToDirNameForSearch " открытый файл - из директории .vimprj, так что для него
+      "if strpart(l:sFilename, 0, l:iPathToDNFSlen) == l:sPathToDirNameForSearch " открытый файл - из директории .vimprj, так что для него
+
+      if <SID>IsFileInSubdir(l:sFilename, l:sPathToDirNameForSearch)
          " НЕ будем применять настройки из этой директории.
          let l:sProjectRoot = ''
       endif
