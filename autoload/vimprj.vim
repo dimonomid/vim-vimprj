@@ -5,7 +5,73 @@ if v:version < 700
    finish
 endif
 
+" Dependencies
 
+let s:iDfrankUtil_min_version = 100
+
+" Dependency functions
+
+function! <SID>GetVersionString(iVersion)
+   let l:iLen = strlen(a:iVersion)
+   return strpart(a:iVersion, 0, l:iLen - 2).'.'.strpart(a:iVersion, l:iLen - 2)
+endfunction
+
+function! <SID>CheckCompatibility(sCurPluginName, sDepPluginName, sDepPluginVerVar, iDepPluginNeededVer)
+   let l:iDepPluginCurVer = -1
+   let l:dRes = {'boolCompatible' : 0, 'msg' : ''}
+
+   if exists(a:sDepPluginVerVar)
+      exec ('let l:iDepPluginCurVer = '.a:sDepPluginVerVar)
+   endif
+
+   if l:iDepPluginCurVer < a:iDepPluginNeededVer
+      let l:dRes.boolCompatible = 0
+
+      if !exists('s:'.a:sCurPluginName.a:sDepPluginName.'_warning_shown')
+         let l:sMsg = a:sCurPluginName." error: you need for plugin '".a:sDepPluginName."' version ".<SID>GetVersionString(a:iDepPluginNeededVer)." to be installed, but "
+         if l:iDepPluginCurVer > 0
+            let l:sMsg .= "your current version of '".a:sDepPluginName."' is ".<SID>GetVersionString(l:iDepPluginCurVer)
+         else
+            let l:sMsg .= "you have not currently '".a:sDepPluginName."' installed."
+         endif
+         exec 'let s:'.a:sCurPluginName.a:sDepPluginName.'_warning_shown = 1'
+         let l:dRes.msg = l:sMsg
+      endif
+   else
+      let l:dRes.boolCompatible = 1
+      " versions are compatible
+   endif
+
+   return l:dRes
+
+endfunction
+
+
+" CHECK DEPENDENCY: DfrankUtil
+
+try
+   call dfrank#util#init()
+catch
+   " no DfrankUtil plugin installed
+endtry
+
+let s:sDfrankUtilCompatibility = <SID>CheckCompatibility(
+         \     "Vimprj", 
+         \     "DfrankUtil", 
+         \     "g:dfrank#util#version", 
+         \     s:iDfrankUtil_min_version
+         \  )
+
+if !s:sDfrankUtilCompatibility.boolCompatible
+   if !empty(s:sDfrankUtilCompatibility.msg)
+      call confirm(s:sDfrankUtilCompatibility.msg)
+   endif
+   finish
+endif
+
+
+
+" all dependencies is ok
 
 let g:vimprj#version           = 106
 let g:vimprj#loaded            = 1
@@ -114,19 +180,6 @@ endfunction
 " ************************************************************************************************
 "                                       PRIVATE FUNCTIONS
 " ************************************************************************************************
-
-function! <SID>IsFileInSubdir(sFilename, sDirname)
-   let l:sDirname = expand(a:sDirname)
-   let l:sFilename = expand(a:sFilename)
-
-   let l:iPathToDirLen = strlen(l:sDirname)
-
-   return (strpart(l:sFilename, 0, l:iPathToDirLen) == l:sDirname)
-endfunction
-
-function! <SID>_GetPathHeader(sPath)
-   return substitute(a:sPath, '\v^(.*)[\\/]([^\\/]+)[\\/]{0,1}$', '\1', '')
-endfunction
 
 
 
@@ -355,7 +408,7 @@ endfunction
 function! <SID>GetVimprjRootOfFile(iFileNum)
 
    let l:sFilename = dfrank#util#BufName(a:iFileNum) "expand('<afile>:p:h')
-   let l:sDirname = <SID>_GetPathHeader(l:sFilename)
+   let l:sDirname = dfrank#util#GetPathHeader(l:sFilename)
 
    let l:i = 0
    let l:sCurPath = ''
@@ -384,7 +437,7 @@ function! <SID>GetVimprjRootOfFile(iFileNum)
 
       "if strpart(l:sFilename, 0, l:iPathToDNFSlen) == l:sPathToDirNameForSearch " открытый файл - из директории .vimprj, так что для него
 
-      if <SID>IsFileInSubdir(l:sFilename, l:sPathToDirNameForSearch)
+      if dfrank#util#IsFileInSubdir(l:sFilename, l:sPathToDirNameForSearch)
          " НЕ будем применять настройки из этой директории.
          let l:sProjectRoot = ''
       endif
