@@ -152,8 +152,8 @@ function! vimprj#init()
 
    let g:vimprj#dHooks = {
             \     'NeedSkipBuffer'       : {},
-            \     'OnAddNewVimprjRoot'   : {},
-            \     'SetDefaultOptions'    : {},
+            \     'SetDefaultOptions'    : {}, " called BEFORE sourcing .vimprj
+            \     'OnAddNewVimprjRoot'   : {}, " called AFTER sourcing .vimprj
             \     'OnTakeAccountOfFile'  : {},
             \     'OnFileOpen'           : {},
             \     'OnBufSave'            : {},
