@@ -150,10 +150,16 @@ function! vimprj#init()
    " -- hooks --
    "  You can look example of using this hooks in plugin Indexer ( http://goo.gl/KbPoA )
 
+
+
+   " NOTE:
+   "     SetDefaultOptions  :  called BEFORE sourcing .vimprj
+   "     OnAddNewVimprjRoot :  called AFTER sourcing .vimprj
+
    let g:vimprj#dHooks = {
             \     'NeedSkipBuffer'       : {},
-            \     'SetDefaultOptions'    : {}, " called BEFORE sourcing .vimprj
-            \     'OnAddNewVimprjRoot'   : {}, " called AFTER sourcing .vimprj
+            \     'SetDefaultOptions'    : {},
+            \     'OnAddNewVimprjRoot'   : {},
             \     'OnTakeAccountOfFile'  : {},
             \     'OnFileOpen'           : {},
             \     'OnBufSave'            : {},
