@@ -420,7 +420,7 @@ endfunction
 function! <SID>GetVimprjRootOfFile(iFileNum)
 
    let l:sFilename = dfrank#util#BufName(a:iFileNum) "expand('<afile>:p:h')
-   let l:sDirname = dfrank#util#GetPathHeader(l:sFilename)
+   let l:sDirname = fnamemodify(l:sFilename, ":h")
 
    let l:i = 0
    let l:sCurPath = ''
