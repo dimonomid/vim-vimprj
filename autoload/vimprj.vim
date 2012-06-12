@@ -1,4 +1,10 @@
 
+" VERSION HISTORY
+"
+" ...
+" *)  1.07 - nested projects supported (i needed them because of vimwiki)
+
+
 " g:vimprj#dRoots - DICTIONARY with info about $INDEXER_PROJECT_ROOTs
 "     [  <$INDEXER_PROJECT_ROOT>  ] - DICTIONARY KEY
 "        ["cd_path"] - path for CD. Can't be empty.
@@ -104,7 +110,7 @@ endif
 
 " all dependencies is ok
 
-let g:vimprj#version           = 106
+let g:vimprj#version           = 107
 let g:vimprj#loaded            = 1
 
 let s:boolInitialized          = 0
@@ -129,6 +135,14 @@ function! vimprj#applyVimprjSettings(sVimprjKey)
    "call confirm ("vimprj#applyVimprjSettings ".a:sVimprjKey)
 
    "call <SID>SourceVimprjFiles(g:vimprj#dRoots[ a:sVimprjKey ]["path"])
+
+   "call confirm('SetDefaultOptions '.g:vimprj#dRoots[ a:sVimprjKey ]["path"])
+   call <SID>ExecHooks('SetDefaultOptions', {
+            \     'sVimprjDirName' : g:vimprj#dRoots[ a:sVimprjKey ]["path"]
+            \  })
+
+
+
    for l:sCurVimprjFolder in g:vimprj#dRoots[ a:sVimprjKey ]["paths_to_vimprj"]
       call <SID>SourceVimprjFiles(l:sCurVimprjFolder)
    endfor
@@ -181,7 +195,7 @@ function! vimprj#init()
 
 
    " NOTE:
-   "     SetDefaultOptions  :  called BEFORE sourcing .vimprj
+   "     SetDefaultOptions  :  called BEFORE sourcing .vimprj, it might be called "OnApplyVimprjSettings"
    "     OnAddNewVimprjRoot :  called AFTER sourcing .vimprj
 
    let g:vimprj#dHooks = {
@@ -231,6 +245,16 @@ endfunction
 "        projs)
 
 function! <SID>ParseNewVimprjRoot(lProjectRoots)
+
+   let l:sLastVimprjFolder = ""
+   if !empty(a:lProjectRoots)
+      let l:sLastVimprjFolder = a:lProjectRoots[ len(a:lProjectRoots) - 1 ].'/'.g:vimprj_dirNameForSearch
+   endif
+
+   "call confirm('SetDefaultOptions '.l:sLastVimprjFolder)
+   call <SID>ExecHooks('SetDefaultOptions', {
+            \     'sVimprjDirName' : l:sLastVimprjFolder
+            \  })
 
    let l:lCurProjectRoots = []
    for l:sProjectRoot in a:lProjectRoots
@@ -443,8 +467,6 @@ endfunction
 function! <SID>SourceVimprjFiles(sPath)
    "call confirm("sourcing files from: ". a:sPath)
    
-   call <SID>ExecHooks('SetDefaultOptions', {'sVimprjDirName' : a:sPath})
-
    if isdirectory(a:sPath)
 
       " sourcing all *vim files in .vimprj dir
