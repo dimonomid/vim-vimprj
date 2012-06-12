@@ -1,4 +1,29 @@
 
+" g:vimprj#dRoots - DICTIONARY with info about $INDEXER_PROJECT_ROOTs
+"     [  <$INDEXER_PROJECT_ROOT>  ] - DICTIONARY KEY
+"        ["cd_path"] - path for CD. Can't be empty.
+"        ["proj_root"] - $INDEXER_PROJECT_ROOT. Can be empty (for "default")
+"        ["proj_roots"] - list with all hierarchy of proj_roots. (first one is
+"                         the main parent, and the last one is a child)
+"        ["path"] - path to .vimprj dir. Actually, this is
+"                   "proj_root"."/.vimprj", if "proj_root" isn't empty.
+"        ["paths_to_vimprj"] - list with all hierarchy of proj_roots."/.vimprj"
+"        ["mode"] - "IndexerFile" or "ProjectFile"
+"        ..... - many indexer options like "indexerListFilename", etc.
+"
+"
+" g:vimprj#dFiles - DICTIONARY with info about all regular files
+"     [  <bufnr('%')>  ] - DICTIONARY KEY
+"        ["sVimprjKey"] - key for g:vimprj#dRoots
+"        ["projects"] - LIST 
+"                             NOTE!!!
+"                             At this moment only ONE project
+"                             is allowed for each file
+"           [0, 1, 2, ...] - LIST KEY. At this moment, only 0 is available
+"              ["file"] - key for s:dProjFilesParsed
+"              ["name"] - name of project
+"           
+
 
 if v:version < 700
    call confirm("vimprj: You need Vim 7.0 or higher")
@@ -103,7 +128,10 @@ function! vimprj#applyVimprjSettings(sVimprjKey)
    call <SID>_AddToDebugLog(s:DEB_LEVEL__ALL, 'function start: __ApplyVimprjSettings__', {'sVimprjKey' : a:sVimprjKey})
    "call confirm ("vimprj#applyVimprjSettings ".a:sVimprjKey)
 
-   call <SID>SourceVimprjFiles(g:vimprj#dRoots[ a:sVimprjKey ]["path"])
+   "call <SID>SourceVimprjFiles(g:vimprj#dRoots[ a:sVimprjKey ]["path"])
+   for l:sCurVimprjFolder in g:vimprj#dRoots[ a:sVimprjKey ]["paths_to_vimprj"]
+      call <SID>SourceVimprjFiles(l:sCurVimprjFolder)
+   endfor
    call <SID>ChangeDirToVimprj(g:vimprj#dRoots[ a:sVimprjKey ]["cd_path"])
 
    " для каждого проекта, в который входит файл, добавляем tags и path
@@ -129,7 +157,7 @@ function! vimprj#init()
    let s:DEB_LEVEL__ALL    = 3
 
    if !exists('g:vimprj_recurseUpCount')
-      let g:vimprj_recurseUpCount = 10
+      let g:vimprj_recurseUpCount = 100
    endif
 
    if !exists('g:vimprj_dirNameForSearch')
@@ -198,30 +226,38 @@ endfunction
 " Парсит директорию проекта (директорию, в которой лежит директория .vimprj)
 " Добавляет новый vimprj_root
 "
-" @param sProjectRoot path to proj dir
-"
-function! <SID>ParseNewVimprjRoot(sProjectRoot)
+" @param lProjectRoots list with paths to projs dir
+"        (this is list instead of string because we need to support nested
+"        projs)
 
-   let l:sVimprjDirName = a:sProjectRoot.'/'.g:vimprj_dirNameForSearch
+function! <SID>ParseNewVimprjRoot(lProjectRoots)
 
-   " if dir .vimprj exists, and if this vimprj_root has not been parsed yet 
+   let l:lCurProjectRoots = []
+   for l:sProjectRoot in a:lProjectRoots
 
-   if isdirectory(l:sVimprjDirName) || filereadable(l:sVimprjDirName)
-      let l:sVimprjKey = dfrank#util#GetKeyFromPath(a:sProjectRoot)
-      if !has_key(g:vimprj#dRoots, l:sVimprjKey)
+      call add(l:lCurProjectRoots, l:sProjectRoot)
+
+      let l:sVimprjDirName = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
+
+      " if dir .vimprj exists, and if this vimprj_root has not been parsed yet 
+
+      if isdirectory(l:sVimprjDirName) || filereadable(l:sVimprjDirName)
+         let l:sVimprjKey = dfrank#util#GetKeyFromPath(l:sProjectRoot)
+         if !has_key(g:vimprj#dRoots, l:sVimprjKey)
 
 
-         call <SID>SourceVimprjFiles(l:sVimprjDirName)
-         call <SID>ChangeDirToVimprj(substitute(a:sProjectRoot, ' ', '\\ ', 'g'))
+            call <SID>SourceVimprjFiles(l:sVimprjDirName)
+            call <SID>ChangeDirToVimprj(substitute(l:sProjectRoot, ' ', '\\ ', 'g'))
 
-         call <SID>AddNewVimprjRoot(l:sVimprjKey, a:sProjectRoot, a:sProjectRoot)
+            call <SID>AddNewVimprjRoot(l:sVimprjKey, l:lCurProjectRoots, l:sProjectRoot)
 
 
+         endif
+      else
+         echoerr "<SID>ParseNewVimprjRoot error: there's no ".g:vimprj_dirNameForSearch
+                  \  ." dir in the project dir '".l:sProjectRoot."'"
       endif
-   else
-      echoerr "<SID>ParseNewVimprjRoot error: there's no ".g:vimprj_dirNameForSearch
-               \  ." dir in the project dir '".a:sProjectRoot."'"
-   endif
+   endfor
 
 endfunction
 
@@ -229,7 +265,7 @@ endfunction
 function! <SID>CreateDefaultProjectIfNotAlready()
    if !has_key(g:vimprj#dRoots, "default")
       " создаем дефолтный "проект"
-      call <SID>AddNewVimprjRoot("default", "", getcwd())
+      call <SID>AddNewVimprjRoot("default", [], getcwd())
       call <SID>TakeAccountOfFile(0, 'default')
    endif
 endfunction
@@ -320,17 +356,35 @@ endfunction
 "
 " ВНИМАНИЕ! "текущими" параметрами - это означает, что на момент вызова
 " этого метода все .vim файлы из .vimprj уже должны быть выполнены!
-function! <SID>AddNewVimprjRoot(sVimprjKey, sPath, sCdPath)
+function! <SID>AddNewVimprjRoot(sVimprjKey, lPaths, sCdPath)
 
    if !has_key(g:vimprj#dRoots, a:sVimprjKey)
 
-      call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __AddNewVimprjRoot__', {'sVimprjKey' : a:sVimprjKey, 'sPath' : a:sPath, 'sCdPath' : a:sCdPath})
+      call <SID>_AddToDebugLog(s:DEB_LEVEL__PARSE, 'function start: __AddNewVimprjRoot__', {'sVimprjKey' : a:sVimprjKey, 'lPaths' : a:lPaths, 'sCdPath' : a:sCdPath})
+
+      if len(a:lPaths) > 0
+         let l:sPath = a:lPaths[ len(a:lPaths) - 1 ]
+      else
+         let l:sPath = ""
+      endif
 
       let g:vimprj#dRoots[a:sVimprjKey] = {}
-      let g:vimprj#dRoots[a:sVimprjKey]["cd_path"] = a:sCdPath
-      let g:vimprj#dRoots[a:sVimprjKey]["proj_root"] = a:sPath
-      if (!empty(a:sPath))
-         let g:vimprj#dRoots[a:sVimprjKey]["path"] = a:sPath.'/'.g:vimprj_dirNameForSearch
+      let g:vimprj#dRoots[a:sVimprjKey]["cd_path"]    = a:sCdPath
+      let g:vimprj#dRoots[a:sVimprjKey]["proj_root"]  = l:sPath
+      let g:vimprj#dRoots[a:sVimprjKey]["proj_roots"] = a:lPaths
+
+      " -- save all paths to vimprj folders (including all hierarchy)
+      let g:vimprj#dRoots[a:sVimprjKey]["paths_to_vimprj"] = []
+      for l:sCurProjRoot in a:lPaths
+         call add(
+                  \     g:vimprj#dRoots[a:sVimprjKey]["paths_to_vimprj"],
+                  \     l:sCurProjRoot.'/'.g:vimprj_dirNameForSearch
+                  \  )
+      endfor
+
+      " -- save just last path to vimprj folder
+      if (!empty(l:sPath))
+         let g:vimprj#dRoots[a:sVimprjKey]["path"] = l:sPath.'/'.g:vimprj_dirNameForSearch
       else
          let g:vimprj#dRoots[a:sVimprjKey]["path"] = ""
       endif
@@ -423,18 +477,30 @@ function! <SID>GetVimprjRootOfFile(iFileNum)
    let l:sDirname = fnamemodify(l:sFilename, ":h")
 
    let l:i = 0
-   let l:sCurPath = ''
+   let l:sCurPath = l:sDirname
    let l:sProjectRoot = ''
+   let l:lProjectRoots = []
    while (l:i < g:vimprj_recurseUpCount)
-      let l:sTmp = simplify(l:sDirname.l:sCurPath.'/'.g:vimprj_dirNameForSearch)
+      let l:sTmp = simplify(l:sCurPath.'/'.g:vimprj_dirNameForSearch)
       if isdirectory(l:sTmp) || filereadable(l:sTmp)
 
          " directory or file with needed name found
-         let l:sProjectRoot = simplify(l:sDirname.l:sCurPath)
-         break
+         if empty(l:sProjectRoot)
+            let l:sProjectRoot = l:sCurPath
+         endif
+         call add(l:lProjectRoots, l:sCurPath)
+         "break
 
       endif
-      let l:sCurPath = l:sCurPath.'/..'
+      
+      " get upper path
+      let l:sNextCurPath = simplify(l:sCurPath.'/..')
+      if (l:sNextCurPath == l:sCurPath)
+         " we reached root of filesystem. break now
+         break
+      endif
+      let l:sCurPath = l:sNextCurPath
+
       let l:i = l:i + 1
    endwhile
 
@@ -463,8 +529,9 @@ function! <SID>GetVimprjRootOfFile(iFileNum)
    endif
 
    return      {
-            \     'sProjectRoot' : l:sProjectRoot,
-            \     'sVimprjKey'   : l:sVimprjKey,
+            \     'lProjectRoots' : reverse(l:lProjectRoots),
+            \     'sProjectRoot'  : l:sProjectRoot,
+            \     'sVimprjKey'    : l:sVimprjKey,
             \  }
 
 endfunction
@@ -493,8 +560,11 @@ function! <SID>OnFileOpen(iFileNum)
    " ищем .vimprj
    let l:dTmp = <SID>GetVimprjRootOfFile(l:iFileNum)
 
-   let l:sVimprjKey   = l:dTmp['sVimprjKey']
-   let l:sProjectRoot = l:dTmp['sProjectRoot']
+   "echo l:dTmp['lProjectRoots']
+   "call confirm('1')
+
+   let l:sVimprjKey    = l:dTmp['sVimprjKey']
+   let l:lProjectRoots = l:dTmp['lProjectRoots']
 
    " if file account is already taken, we should anyway parse it again,
    " because it happens at least at :saveas new_filename
@@ -514,10 +584,10 @@ function! <SID>OnFileOpen(iFileNum)
       " .vimprj project is NOT known.
       " adding.
 
-      " l:sProjectRoot can NEVER be empty here,
+      " l:lProjectRoots can NEVER be empty here,
       " because it is empty only for 'default' sVimprjKey,
       " and this sVimprjKey is added when vim starts.
-      call <SID>ParseNewVimprjRoot(l:sProjectRoot)
+      call <SID>ParseNewVimprjRoot(l:lProjectRoots)
 
    else
       " .vimprj project is known.
