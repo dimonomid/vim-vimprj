@@ -3,6 +3,9 @@
 "
 " ...
 " *)  1.07 - nested projects supported (i needed them because of vimwiki)
+" *)  1.08 - 'default' project creation logic changed: now it is created just
+"            when opened some file not from any project, but in prev. versions
+"            it was created at Vim start
 
 
 " g:vimprj#dRoots - DICTIONARY with info about $INDEXER_PROJECT_ROOTs
@@ -110,7 +113,7 @@ endif
 
 " all dependencies is ok
 
-let g:vimprj#version           = 107
+let g:vimprj#version           = 108
 let g:vimprj#loaded            = 1
 
 let s:boolInitialized          = 0
@@ -141,11 +144,14 @@ function! vimprj#applyVimprjSettings(sVimprjKey)
             \     'sVimprjDirName' : g:vimprj#dRoots[ a:sVimprjKey ]["path"]
             \  })
 
-
-
    for l:sCurVimprjFolder in g:vimprj#dRoots[ a:sVimprjKey ]["paths_to_vimprj"]
       call <SID>SourceVimprjFiles(l:sCurVimprjFolder)
    endfor
+
+   call <SID>ExecHooks('OnAfterSourcingVimprj', {
+            \     'sVimprjDirName' : g:vimprj#dRoots[ a:sVimprjKey ]["path"]
+            \  })
+
    call <SID>ChangeDirToVimprj(g:vimprj#dRoots[ a:sVimprjKey ]["cd_path"])
 
    " для каждого проекта, в который входит файл, добавляем tags и path
@@ -166,6 +172,7 @@ function! vimprj#init()
 
    "echoerr "initing"
 
+   let s:sStartCwd = getcwd()
    let s:DEB_LEVEL__ASYNC  = 1
    let s:DEB_LEVEL__PARSE  = 2
    let s:DEB_LEVEL__ALL    = 3
@@ -186,8 +193,8 @@ function! vimprj#init()
    " задаем пустые массивы с данными
    let g:vimprj#dRoots = {}
    let g:vimprj#dFiles = {}
-   let g:vimprj#iCurFileNum = 0
-   let g:vimprj#sCurVimprjKey = 'default'
+   let g:vimprj#iCurFileNum = -1
+   let g:vimprj#sCurVimprjKey = ''
 
    " -- hooks --
    "  You can look example of using this hooks in plugin Indexer ( http://goo.gl/KbPoA )
@@ -201,6 +208,7 @@ function! vimprj#init()
    let g:vimprj#dHooks = {
             \     'NeedSkipBuffer'       : {},
             \     'SetDefaultOptions'    : {},
+            \     'OnAfterSourcingVimprj': {},
             \     'OnAddNewVimprjRoot'   : {},
             \     'OnTakeAccountOfFile'  : {},
             \     'OnFileOpen'           : {},
@@ -283,14 +291,37 @@ function! <SID>ParseNewVimprjRoot(lProjectRoots)
       endif
    endfor
 
+   call <SID>ExecHooks('OnAfterSourcingVimprj', {
+            \     'sVimprjDirName' : l:sLastVimprjFolder
+            \  })
+
+
 endfunction
 
 
 function! <SID>CreateDefaultProjectIfNotAlready()
    if !has_key(g:vimprj#dRoots, "default")
+      
+      call <SID>ExecHooks('SetDefaultOptions', {
+               \     'sVimprjDirName' : ''
+               \  })
+
       " создаем дефолтный "проект"
-      call <SID>AddNewVimprjRoot("default", [], getcwd())
-      call <SID>TakeAccountOfFile(0, 'default')
+      call <SID>ChangeDirToVimprj(substitute(s:sStartCwd, ' ', '\\ ', 'g'))
+      call <SID>AddNewVimprjRoot("default", [], s:sStartCwd)
+      "call <SID>TakeAccountOfFile(0, 'default')
+
+      call <SID>ExecHooks('OnAfterSourcingVimprj', {
+               \     'sVimprjDirName' : ''
+               \  })
+
+
+      "if 'default' != g:vimprj#sCurVimprjKey
+         "call vimprj#applyVimprjSettings('default')
+         "call <SID>SetCurrentFile(0)
+      "endif
+
+
    endif
 endfunction
 
@@ -353,6 +384,7 @@ function! <SID>ExecHooks(sHooksgroup, dParams)
 
       silent! let l:dParams['dVimprjRootParams'] = 
                   \  g:vimprj#dRoots[g:vimprj#sCurVimprjKey][ l:sKey ]
+      "echo l:dParams
 
       "try
          "call add(l:lRetValues, g:vimprj#dHooks[ a:sHooksgroup ][ l:sKey ](l:dParams))
@@ -422,8 +454,8 @@ endfunction
 
 
 
-" returns if we should to skip this buffer ('skip' means not to generate tags
-" for it)
+" returns if we should to skip this buffer ('skipped' buffers are not handled
+" by vimprj plugin at all)
 function! <SID>NeedSkipBuffer(iFileNum)
 
    " COMMENTED!! file should be readable 
@@ -445,6 +477,7 @@ function! <SID>NeedSkipBuffer(iFileNum)
    endif
 
    " buffer name should not be empty
+   " (because we can't detect which project has a file without filename)
    if empty(bufname(a:iFileNum))
       return 1
    endif
@@ -547,6 +580,7 @@ function! <SID>GetVimprjRootOfFile(iFileNum)
    if !empty(l:sProjectRoot)
       let l:sVimprjKey = dfrank#util#GetKeyFromPath(l:sProjectRoot)
    else
+      "call <SID>CreateDefaultProjectIfNotAlready()
       let l:sVimprjKey = "default"
    endif
 
@@ -565,7 +599,7 @@ function! <SID>OnFileOpen(iFileNum)
    "call confirm("OnFileOpen " . a:iFileNum . " " . bufname(a:iFileNum))
 
 
-   call <SID>CreateDefaultProjectIfNotAlready()
+   "call <SID>CreateDefaultProjectIfNotAlready()
 
    if (<SID>NeedSkipBuffer(l:iFileNum))
       return
@@ -609,7 +643,22 @@ function! <SID>OnFileOpen(iFileNum)
       " l:lProjectRoots can NEVER be empty here,
       " because it is empty only for 'default' sVimprjKey,
       " and this sVimprjKey is added when vim starts.
-      call <SID>ParseNewVimprjRoot(l:lProjectRoots)
+      if l:sVimprjKey != 'default'
+         call <SID>ParseNewVimprjRoot(l:lProjectRoots)
+      else
+         call <SID>ExecHooks('SetDefaultOptions', {
+                  \     'sVimprjDirName' : ''
+                  \  })
+
+         " создаем дефолтный "проект"
+         call <SID>ChangeDirToVimprj(substitute(s:sStartCwd, ' ', '\\ ', 'g'))
+         call <SID>AddNewVimprjRoot("default", [], s:sStartCwd)
+         "call <SID>TakeAccountOfFile(0, 'default')
+
+         call <SID>ExecHooks('OnAfterSourcingVimprj', {
+                  \     'sVimprjDirName' : ''
+                  \  })
+      endif
 
    else
       " .vimprj project is known.
@@ -666,7 +715,8 @@ endfunction
 function! <SID>OnBufEnter(iFileNum)
    let l:iFileNum = a:iFileNum
 
-   call <SID>CreateDefaultProjectIfNotAlready()
+   "call confirm('OnBufEnter')
+   "call <SID>CreateDefaultProjectIfNotAlready()
 
    if (<SID>NeedSkipBuffer(l:iFileNum))
       return
@@ -679,6 +729,7 @@ function! <SID>OnBufEnter(iFileNum)
    if (!<SID>IsBufSwitched())
       return
    endif
+   "call confirm('buf switched. '.iFileNum)
 
    if !<SID>IsFileAccountTaken(l:iFileNum)
       "echoerr "not taken account of ".bufname(l:iFileNum)
