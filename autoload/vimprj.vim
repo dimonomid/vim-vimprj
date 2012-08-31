@@ -369,7 +369,7 @@ endfunction
 
 function! <SID>ExecHooks(sHooksgroup, dParams)
    "echoerr a:sHooksgroup
-   "call confirm("ExecHooks ".a:sHooksgroup)
+   call confirm("ExecHooks ".a:sHooksgroup)
    let l:lRetValues = []
    let l:dParams = a:dParams
 
@@ -478,9 +478,9 @@ function! <SID>NeedSkipBuffer(iFileNum)
 
    " buffer name should not be empty
    " (because we can't detect which project has a file without filename)
-   if empty(bufname(a:iFileNum))
-      return 1
-   endif
+   "if empty(bufname(a:iFileNum))
+      "return 1
+   "endif
 
 
    let l:lNeedSkip = <SID>ExecHooks('NeedSkipBuffer', {
@@ -528,60 +528,65 @@ endfunction
 
 function! <SID>GetVimprjRootOfFile(iFileNum)
 
-   let l:sFilename = dfrank#util#BufName(a:iFileNum) "expand('<afile>:p:h')
-   let l:sDirname = fnamemodify(l:sFilename, ":h")
-
-   let l:i = 0
-   let l:sCurPath = l:sDirname
    let l:sProjectRoot = ''
    let l:lProjectRoots = []
-   while (l:i < g:vimprj_recurseUpCount)
-      let l:sTmp = simplify(l:sCurPath.'/'.g:vimprj_dirNameForSearch)
-      if isdirectory(l:sTmp) || filereadable(l:sTmp)
+   let l:sVimprjKey = "default"
 
-         " directory or file with needed name found
-         if empty(l:sProjectRoot)
-            let l:sProjectRoot = l:sCurPath
+   let l:sFilename = dfrank#util#BufName(a:iFileNum) "expand('<afile>:p:h')
+   if !empty(l:sFilename)
+      let l:sDirname = fnamemodify(l:sFilename, ":h")
+
+      let l:i = 0
+      let l:sCurPath = l:sDirname
+      while (l:i < g:vimprj_recurseUpCount)
+         let l:sTmp = simplify(l:sCurPath.'/'.g:vimprj_dirNameForSearch)
+         if isdirectory(l:sTmp) || filereadable(l:sTmp)
+
+            " directory or file with needed name found
+            if empty(l:sProjectRoot)
+               let l:sProjectRoot = l:sCurPath
+            endif
+            call add(l:lProjectRoots, l:sCurPath)
+            "break
+
          endif
-         call add(l:lProjectRoots, l:sCurPath)
-         "break
+         
+         " get upper path
+         let l:sNextCurPath = simplify(l:sCurPath.'/..')
+         if (l:sNextCurPath == l:sCurPath)
+            " we reached root of filesystem. break now
+            break
+         endif
+         let l:sCurPath = l:sNextCurPath
+
+         let l:i = l:i + 1
+      endwhile
+
+      if !empty(l:sProjectRoot)
+
+         " .vimprj directory or file is found.
+         " проверяем, не открыли ли мы файл из директории .vimprj (или, если это
+         " файл, то не открыли ли мы этот файл)
+
+         let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
+         "let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
+
+         "if strpart(l:sFilename, 0, l:iPathToDNFSlen) == l:sPathToDirNameForSearch " открытый файл - из директории .vimprj, так что для него
+
+         if dfrank#util#IsFileInSubdir(l:sFilename, l:sPathToDirNameForSearch)
+            " НЕ будем применять настройки из этой директории.
+            let l:sProjectRoot = ''
+         endif
 
       endif
-      
-      " get upper path
-      let l:sNextCurPath = simplify(l:sCurPath.'/..')
-      if (l:sNextCurPath == l:sCurPath)
-         " we reached root of filesystem. break now
-         break
+
+      if !empty(l:sProjectRoot)
+         let l:sVimprjKey = dfrank#util#GetKeyFromPath(l:sProjectRoot)
+      else
+         " no project owns this file. Leave "default".
       endif
-      let l:sCurPath = l:sNextCurPath
-
-      let l:i = l:i + 1
-   endwhile
-
-   if !empty(l:sProjectRoot)
-
-      " .vimprj directory or file is found.
-      " проверяем, не открыли ли мы файл из директории .vimprj (или, если это
-      " файл, то не открыли ли мы этот файл)
-
-      let l:sPathToDirNameForSearch = l:sProjectRoot.'/'.g:vimprj_dirNameForSearch
-      "let l:iPathToDNFSlen = strlen(l:sPathToDirNameForSearch)
-
-      "if strpart(l:sFilename, 0, l:iPathToDNFSlen) == l:sPathToDirNameForSearch " открытый файл - из директории .vimprj, так что для него
-
-      if dfrank#util#IsFileInSubdir(l:sFilename, l:sPathToDirNameForSearch)
-         " НЕ будем применять настройки из этой директории.
-         let l:sProjectRoot = ''
-      endif
-
-   endif
-
-   if !empty(l:sProjectRoot)
-      let l:sVimprjKey = dfrank#util#GetKeyFromPath(l:sProjectRoot)
    else
-      "call <SID>CreateDefaultProjectIfNotAlready()
-      let l:sVimprjKey = "default"
+      " filename is empty. Leave "default" project.
    endif
 
    return      {
