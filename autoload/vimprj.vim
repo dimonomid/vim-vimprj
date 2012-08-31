@@ -369,7 +369,7 @@ endfunction
 
 function! <SID>ExecHooks(sHooksgroup, dParams)
    "echoerr a:sHooksgroup
-   call confirm("ExecHooks ".a:sHooksgroup)
+   "call confirm("ExecHooks ".a:sHooksgroup)
    let l:lRetValues = []
    let l:dParams = a:dParams
 
