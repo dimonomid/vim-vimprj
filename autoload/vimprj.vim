@@ -6,6 +6,9 @@
 " *)  1.08 - 'default' project creation logic changed: now it is created just
 "            when opened some file not from any project, but in prev. versions
 "            it was created at Vim start
+" *)  1.09 - fixed issue: if quickfix window is opened, and user compiles
+"            current file (types :make ), then vimprj swithed to the 
+"            'default' settings.
 
 
 " g:vimprj#dRoots - DICTIONARY with info about $INDEXER_PROJECT_ROOTs
@@ -113,7 +116,7 @@ endif
 
 " all dependencies is ok
 
-let g:vimprj#version           = 108
+let g:vimprj#version           = 109
 let g:vimprj#loaded            = 1
 
 let s:boolInitialized          = 0
