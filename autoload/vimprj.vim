@@ -466,6 +466,16 @@ function! <SID>NeedSkipBuffer(iFileNum)
       "return 1
    "endif
 
+   " skip negative filenumbers 
+   " (I'm not sure why this happens, but:
+   "  If quickfix window is opened, and I call :mak , then <SID>OnFileOpen(-1)
+   "  is called.
+   "  So, I just added this check here.
+   " )
+   if a:iFileNum < 0
+      return 1
+   endif
+
    " skip directories
    if isdirectory(bufname(a:iFileNum))
       return 1
