@@ -192,6 +192,10 @@ function! vimprj#init()
       let g:vimprj_changeCurDirIfVimprjFound = 1
    endif
 
+   if !exists('g:vimprj_sourceScriptsOnlyIfVimprjChanged')
+      let g:vimprj_sourceScriptsOnlyIfVimprjChanged = 1
+   endif
+
 
    " задаем пустые массивы с данными
    let g:vimprj#dRoots = {}
@@ -681,7 +685,7 @@ function! <SID>OnFileOpen(iFileNum)
    else
       " .vimprj project is known.
       " if it is inactive - applying settings from it.
-      if l:sVimprjKey != g:vimprj#sCurVimprjKey
+      if l:sVimprjKey != g:vimprj#sCurVimprjKey || !g:vimprj_sourceScriptsOnlyIfVimprjChanged
          call vimprj#applyVimprjSettings(l:sVimprjKey)
       endif
 
@@ -758,7 +762,7 @@ function! <SID>OnBufEnter(iFileNum)
    call <SID>SetCurrentFile(l:iFileNum)
 
    " applying vimprj settings if only vimprj root changed
-   if l:sPrevVimprjKey != g:vimprj#sCurVimprjKey
+   if l:sPrevVimprjKey != g:vimprj#sCurVimprjKey || !g:vimprj_sourceScriptsOnlyIfVimprjChanged
       call vimprj#applyVimprjSettings(g:vimprj#sCurVimprjKey)
    endif
 
