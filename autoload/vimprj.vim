@@ -187,7 +187,7 @@ function! vimprj#init()
    endif
 
    if !exists('g:vimprj_changeCurDirIfVimprjFound')
-      let g:vimprj_changeCurDirIfVimprjFound = 1
+      let g:vimprj_changeCurDirIfVimprjFound = 0
    endif
 
    if !exists('g:vimprj_sourceScriptsOnlyIfVimprjChanged')
