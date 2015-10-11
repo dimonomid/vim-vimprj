@@ -10,6 +10,11 @@
 "            current file (types :make ), then vimprj swithed to the 
 "            'default' settings.
 " *)  1.10 - fixed issue with spaces in paths (thanks to Alexey Shevchenko)
+" *)  1.11 - added $VIMPRJ_PROJECT_ROOT variable, which is set to the root of
+"            the currently active project.
+"          - default behavior changed: now, by default, Vimprj doesn't change
+"            your current working directory.
+"            Set g:vimprj_changeCurDirIfVimprjFound if you want it to do so.
 
 
 " g:vimprj#dRoots - DICTIONARY with info about $INDEXER_PROJECT_ROOTs
@@ -117,7 +122,7 @@ endif
 
 " all dependencies is ok
 
-let g:vimprj#version           = 110
+let g:vimprj#version           = 111
 let g:vimprj#loaded            = 1
 
 let s:boolInitialized          = 0
