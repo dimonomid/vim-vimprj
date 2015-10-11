@@ -532,10 +532,10 @@ function! <SID>SourceVimprjFiles(sPath)
 endfunction
 
 function! <SID>ChangeDirToVimprj(sPath)
-   " переключаем рабочую директорию
+   " switch working dir
    if (g:vimprj_changeCurDirIfVimprjFound)
       exec "cd ".a:sPath
-      " ???? иначе не работает
+      " ???? very strange, but sometimes it doesn't work otherwise
       exec "cd ".a:sPath
    endif
 endfunction
@@ -689,6 +689,8 @@ function! <SID>OnFileOpen(iFileNum)
 
 
    call <SID>SetCurrentFile(l:iFileNum)
+
+   let $VIMPRJ_PROJECT_ROOT = g:vimprj#dRoots[ l:sVimprjKey ].proj_root
 
    call <SID>ExecHooks('OnFileOpen', {
             \     'iFileNum'   : l:iFileNum,

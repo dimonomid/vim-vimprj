@@ -4,10 +4,10 @@
 
 
                      By Dmitry Frank
-                  dimon.frank@gmail.com
+                   mail@dmitryfrank.com
 
 Firstly: if you have any questions regards this plugin, feel free
-to email me: dimon.frank@gmail.com
+to email me: mail@dmitryfrank.com
 
 
                                           *vimprj* *vimprj-plugin*
